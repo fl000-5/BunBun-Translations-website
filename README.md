@@ -1,1 +1,1 @@
-# BunBun-Translations-website
+# Strona z tłumaczeniami serwera BunBun Translations 
