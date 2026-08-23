@@ -1,1 +1,1 @@
-# Strona z tłumaczeniami serwera BunBun Translations 
+# Strona z tłumaczeniami serwera BunBun Translations 🐇✨
