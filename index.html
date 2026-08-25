@@ -35,7 +35,6 @@
             <button type="button" data-view="profile">Profil</button>
             <button type="button" data-admin-action="add-title">Dodaj nowy tytuł</button>
             <button type="button" data-admin-action="add-chapter">Dodaj nowy rozdział</button>
-            <button type="button" data-admin-action="data">Dane</button>
             <button type="button" id="logoutButton">Wyloguj</button>
           </div>
         </div>
@@ -305,61 +304,7 @@
           </label>
           <button class="primary-button" type="submit">Dodaj rozdział</button>
         </form>
-        <button class="ghost-button side-admin-button" type="button" data-view="data">Dane</button>
       </section>
-
-      <section class="view" id="dataView" data-view-name="data">
-        <div class="panel-heading">
-          <h1>Dane</h1>
-          <p>Konfiguracja Discorda, licznika z kanału i ról użytkowników.</p>
-        </div>
-
-        <form id="dataForm" class="form-shell">
-          <div class="two-columns">
-            <label>
-              Client ID aplikacji Discord
-              <input id="discordClientId" placeholder="np. 123456789012345678">
-            </label>
-            <label>
-              Redirect link
-              <input id="discordRedirectUri" placeholder="https://twojadomena.pl/api/auth/discord/callback">
-            </label>
-          </div>
-          <div class="two-columns">
-            <label>
-              ID kanału z liczbą osób
-              <input id="discordCountChannelId" placeholder="ID kanału, np. 123456789012345678">
-            </label>
-            <label>
-              ID roli Tłumacz
-              <input id="discordTranslatorRoleId" placeholder="ID roli z Discorda">
-            </label>
-            <label>
-              ID roli Pomocnik tłumaczy
-              <input id="discordHelperRoleId" placeholder="ID roli z Discorda">
-            </label>
-          </div>
-          <button class="primary-button" type="submit">Zapisz dane</button>
-        </form>
-
-        <section class="role-panel">
-          <div class="section-heading">
-            <h2>Role użytkowników</h2>
-            <p>Domyślnie każdy zalogowany użytkownik dostaje rolę Czytelnik.</p>
-          </div>
-          <div class="role-grid" id="roleGrid"></div>
-        </section>
-
-        <section class="discord-note">
-          <h2>Jak połączyć licznik z Discordem</h2>
-          <p>
-            Frontend zapamiętuje ID kanału, ale realną liczbę musi pobrać backend z botem Discorda. Endpoint
-            <code>/api/discord/stats</code> powinien użyć tokenu bota po stronie serwera, odczytać kanał po ID
-            i zwrócić liczbę w formacie <code>{ "members": 123, "translators": 4 }</code>.
-          </p>
-        </section>
-      </section>
-
 
     </main>
 

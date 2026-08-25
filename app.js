@@ -187,10 +187,10 @@
     bindFilters();
     bindTeam();
     bindForms();
-    hydrateConfigForm();
     await initDiscordSession();
     renderAll();
     await syncTitlesFromServer();
+    await hydrateTeamUsers();
     syncPublishedChapters();
     window.setInterval(syncPublishedChapters, 15000);
     route();
@@ -224,9 +224,62 @@
     });
     searchInput.addEventListener("input", () => {
       state.titleQuery = searchInput.value.trim();
+      renderGlobalSearch();
       if (activeViewName() === "translations") {
         renderTranslations();
       }
+    });
+    searchInput.addEventListener("focus", () => renderGlobalSearch());
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("#searchForm")) {
+        document.querySelector("#globalSearchResults")?.classList.add("is-hidden");
+      }
+    });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        searchInput.value = "";
+        state.titleQuery = "";
+        document.querySelector("#globalSearchResults")?.classList.add("is-hidden");
+        if (activeViewName() === "translations") renderTranslations();
+      }
+    });
+  }
+
+  function renderGlobalSearch() {
+    const box = document.querySelector("#globalSearchResults");
+    const input = document.querySelector("#titleSearch");
+    if (!box || !input) return;
+    const query = input.value.trim().toLowerCase();
+    if (!query) {
+      box.classList.add("is-hidden");
+      box.innerHTML = "";
+      return;
+    }
+
+    const results = state.translations
+      .filter((title) => title.title.toLowerCase().includes(query))
+      .sort((a, b) => a.title.localeCompare(b.title, "pl", { sensitivity: "base" }))
+      .slice(0, 8);
+
+    box.innerHTML = results.length
+      ? results.map((title) => `
+          <button type="button" class="global-search-result" data-global-search-title="${escapeAttr(title.id)}">
+            <img src="${escapeAttr(title.cover)}" alt="">
+            <span>
+              <b>${escapeHtml(title.title)}</b>
+              <small>${escapeHtml(title.type)} · ${escapeHtml(title.status)}</small>
+            </span>
+          </button>
+        `).join("")
+      : `<div class="global-search-empty">Nie znaleziono tytułu.</div>`;
+
+    box.classList.remove("is-hidden");
+    box.querySelectorAll("[data-global-search-title]").forEach((button) => {
+      button.addEventListener("click", () => {
+        box.classList.add("is-hidden");
+        input.blur();
+        openTitle(button.dataset.globalSearchTitle);
+      });
     });
   }
 
@@ -391,7 +444,6 @@
   function bindForms() {
     document.querySelector("#addTitleForm").addEventListener("submit", handleAddTitle);
     document.querySelector("#addChapterForm").addEventListener("submit", handleAddChapter);
-    document.querySelector("#dataForm").addEventListener("submit", handleSaveData);
     document.querySelector("#chapterTitleSelect").addEventListener("change", updateChapterHints);
     document.querySelector("#chapterFiles").addEventListener("change", handleChapterFiles);
   }
@@ -426,7 +478,6 @@
     populatePeopleSelects();
     populateChapterTitleSelect();
     renderProfile();
-    renderData();
   }
 
   function route() {
@@ -671,39 +722,36 @@
           ? Math.max(...title.chapters.map((chapter) => new Date(chapter.date).getTime() || 0))
           : 0
       }))
+      .filter((item) => item.latestDate > 0)
       .sort((a, b) => b.latestDate - a.latestDate)
       .slice(0, 8);
 
-    grid.innerHTML = latestTitles.map(({ title }) => {
-      const lastChapters = title.chapters
-        .slice()
-        .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
-        .slice(0, 3)
-        .map((chapter) => `<p>${escapeHtml(chapter.number)} · ${escapeHtml(formatDate(chapter.date))}</p>`)
-        .join("");
+    if (!latestTitles.length) {
+      grid.innerHTML = `<div class="latest-empty">Brak opublikowanych rozdziałów.</div>`;
+      return;
+    }
 
+    grid.innerHTML = latestTitles.map(({ title }) => {
       const chapterRows = title.chapters
         .slice()
         .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
         .slice(0, 3)
         .map((chapter) => `
           <button type="button" class="latest-chapter-link" data-open-reader-title="${escapeAttr(title.id)}" data-open-reader-chapter="${escapeAttr(chapter.id)}">
-            <span>${escapeHtml(chapter.number)}</span>
-            <span>${escapeHtml(formatDate(chapter.date))}</span>
+            <span class="latest-chapter-number">${escapeHtml(chapterDisplayName(chapter))}</span>
+            <span class="latest-chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
           </button>
         `).join("");
 
       return `
         <article class="latest-card">
-          <button type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
+          <button class="latest-title-button" type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
             <img src="${escapeAttr(title.cover)}" alt="">
             <div class="latest-card-body">
               <h3>${escapeHtml(title.title)}</h3>
             </div>
           </button>
-          <div class="latest-chapters">
-            ${chapterRows || `<p>Brak opublikowanych rozdziałów</p>`}
-          </div>
+          <div class="latest-chapters">${chapterRows}</div>
         </article>
       `;
     }).join("");
@@ -981,8 +1029,8 @@
                 <span class="tag">${escapeHtml(title.status)}</span>
               </div>
               <div class="title-actions">
-                <button class="primary-button" type="button" data-library="${escapeAttr(title.id)}">
-                  ${inLibrary ? "W bibliotece" : "Dodaj do biblioteki"}
+                <button class="primary-button icon-text-button" type="button" data-library="${escapeAttr(title.id)}">
+                  ${bookmarkIcon()}<span>${inLibrary ? "W bibliotece" : "Dodaj do biblioteki"}</span>
                 </button>
                 ${canEdit ? `<button class="ghost-button icon-text-button" type="button" data-edit-title="${escapeAttr(title.id)}" aria-expanded="false">
                   ${pencilIcon()}<span>Edytuj tytuł</span>
@@ -1426,6 +1474,12 @@
     return Array.from(ids).map((id) => state.users[id] || placeholderUser(id));
   }
 
+  function chapterDisplayName(chapter) {
+    const custom = String(chapter?.title || "").trim();
+    if (custom && custom !== "Nowy rozdział" && !/^Tłumaczenie:/i.test(custom)) return custom;
+    return String(chapter?.number || "Rozdział");
+  }
+
   function renderChapterRow(title, chapter) {
     const read = state.readChapters.includes(chapter.id);
     const liked = state.likedChapters.includes(chapter.id);
@@ -1434,7 +1488,7 @@
       <article class="chapter-card ${read ? "is-read" : ""}" data-chapter-card="${escapeAttr(chapter.id)}">
         <button class="chapter-main-button" type="button" data-open-reader="${escapeAttr(chapter.id)}">
           <span class="chapter-info">
-            <h3>${escapeHtml(chapter.number)}</h3>
+            <h3>${escapeHtml(chapterDisplayName(chapter))}</h3>
             <p>${escapeHtml((chapter.translators || title.translators || []).map(displayUserName).join(", ") || "Brak")}</p>
           </span>
           <span class="chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
@@ -1478,6 +1532,10 @@
         <div class="confirm-modal-icon">${pencilIcon()}</div>
         <h2 id="chapterEditHeading">Edytuj rozdział</h2>
         <form id="chapterEditForm" class="chapter-edit-form">
+          <label>
+            Nazwa rozdziału
+            <input name="title" type="text" value="${escapeAttr(chapter.title || "")}" placeholder="np. Spotkanie">
+          </label>
           <div class="chapter-edit-two-columns">
             <label>
               Numer rozdziału
@@ -1529,7 +1587,7 @@
       const updated = {
         ...chapter,
         number: `Rozdział ${String(data.get("number") || "").trim()}`,
-        title: chapter.title || "Nowy rozdział",
+        title: String(data.get("title") || "").trim(),
         season: String(data.get("season") || "").trim(),
         date: data.get("date") ? `${data.get("date")}T00:00:00.000Z` : chapter.date,
         translators: Array.from(form.querySelectorAll("[name=translators]:checked")).map((input) => input.value)
@@ -1570,7 +1628,7 @@
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="deleteChapterHeading">
         <div class="confirm-modal-icon">${trashIcon()}</div>
         <h2 id="deleteChapterHeading">Na pewno chcesz usunąć ten rozdział?</h2>
-        <p>„${escapeHtml(chapter.number)}” zostanie usunięty ze strony.</p>
+        <p>„${escapeHtml(chapterDisplayName(chapter))}” zostanie usunięty ze strony.</p>
         <div class="confirm-modal-actions">
           <button type="button" class="ghost-button" data-delete-chapter-no>${closeIcon()}<span>Nie</span></button>
           <button type="button" class="danger-button confirm-danger" data-delete-chapter-yes>${trashIcon()}<span>Tak</span></button>
@@ -1626,7 +1684,7 @@
         <div class="reader-bar">
           <button class="ghost-button" type="button" data-back-title="${escapeAttr(title.id)}">← Tytuł</button>
           <div class="reader-title">
-            <h1>${escapeHtml(chapter.number)}</h1>
+            <h1>${escapeHtml(chapterDisplayName(chapter))}</h1>
             <p>${escapeHtml(title.title)} · ${escapeHtml(formatDate(chapter.date))}</p>
           </div>
           <button class="heart-button ${liked ? "is-liked" : ""}" type="button" data-reader-like="${escapeAttr(chapter.id)}">♥ ${chapter.likes}</button>
@@ -1728,7 +1786,6 @@
   }
 
   function renderData() {
-    hydrateConfigForm();
     const roleGrid = document.querySelector("#roleGrid");
     const roleCards = roles.map((role) => `
       <article class="role-card">
@@ -2018,7 +2075,7 @@
   }
 
   function canManageTitles() {
-    return hasAnyRole(["Właściciel", "Współwłaściciel", "Administrator"]);
+    return hasAnyRole(["Właściciel", "Współwłaściciel"]);
   }
 
   function canDeleteSeries() {
@@ -2026,11 +2083,11 @@
   }
 
   function canManageChapters() {
-    return hasAnyRole(["Właściciel", "Współwłaściciel", "Administrator", "Tłumacz"]);
+    return hasAnyRole(["Właściciel", "Współwłaściciel", "Tłumacz"]);
   }
 
   function canManageData() {
-    return hasAnyRole(["Właściciel", "Współwłaściciel", "Administrator"]);
+    return hasAnyRole(["Właściciel", "Współwłaściciel"]);
   }
 
   function hasAnyRole(names) {
@@ -2078,8 +2135,11 @@
 
   function ensureReaderRole(user) {
     const next = clone(user);
-    next.roles = Array.isArray(next.roles) ? next.roles.slice() : [];
-    if (!next.roles.includes("Czytelnik")) next.roles.push("Czytelnik");
+    const order = ["Właściciel", "Współwłaściciel", "Tłumacz", "Pomocnik tłumacza", "Czytelnik"];
+    const sourceRoles = Array.isArray(next.roles) ? next.roles : [];
+    next.roles = order.filter((role) =>
+      role === "Czytelnik" || sourceRoles.includes(role)
+    );
     next.avatar = next.avatar || avatarSvg(initialsFor(next.displayName || next.username || "?"), "#ffe1f0", "#9d3c72");
     next.banner = next.banner || bannerSvg("#ffe0f1", "#ffa6d8", next.displayName || "BB");
     return next;
@@ -2330,6 +2390,10 @@
 
   function saveIcon() {
     return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h11l3 3V20.5H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 3.5v6h7v-6M8.5 20.5v-6h7v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  }
+
+  function bookmarkIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A2.5 2.5 0 0 1 8.5 2h7A2.5 2.5 0 0 1 18 4.5V21l-6-3.8L6 21z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
   }
 
   function calendarIcon() {
