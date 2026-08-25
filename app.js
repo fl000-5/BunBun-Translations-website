@@ -1655,7 +1655,9 @@
       let cells = "";
       for (let i = 0; i < start; i++) {
         const day = prevDays - start + i + 1;
-        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}">${day}</button>`;
+        const prevMonth = new Date(year, month, day);
+        const iso = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2,"0")}-${String(prevMonth.getDate()).padStart(2,"0")}`;
+        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${iso}">${day}</button>`;
       }
       for (let day = 1; day <= days; day++) {
         const iso = `${year}-${String(month + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
@@ -1664,7 +1666,9 @@
       }
       const total = Math.ceil((start + days) / 7) * 7;
       for (let i = start + days, day = 1; i < total; i++, day++) {
-        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${year}-${String(month + 2).padStart(2,"0")}-${String(day).padStart(2,"0")}">${day}</button>`;
+        const nextMonth = new Date(year, month + 1, day);
+        const iso = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2,"0")}-${String(nextMonth.getDate()).padStart(2,"0")}`;
+        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${iso}">${day}</button>`;
       }
 
       calendar.innerHTML = `
@@ -1733,13 +1737,20 @@
       if (!calendar.classList.contains("is-hidden")) positionCalendar();
     }, true);
 
+    document.addEventListener("click", (event) => {
+      if (calendar.classList.contains("is-hidden")) return;
+      if (event.target.closest(".custom-calendar") || event.target.closest(".custom-date-picker")) return;
+      closeCalendar();
+    });
+
     calendar.addEventListener("click", (event) => {
       const button = event.target.closest("[data-calendar-day]");
       if (button) {
         const iso = button.dataset.calendarDay;
         const date = new Date(`${iso}T12:00:00`);
-        if (date.getMonth() !== cursor.getMonth()) {
+        if (date.getMonth() !== cursor.getMonth() || date.getFullYear() !== cursor.getFullYear()) {
           cursor = new Date(date.getFullYear(), date.getMonth(), 1);
+          renderCalendar();
         }
         setDate(iso);
         closeCalendar();
