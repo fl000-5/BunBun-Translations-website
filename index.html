@@ -209,14 +209,12 @@
       </section>
 
       <section class="view" id="addTitleView" data-view-name="add-title">
-        <div class="title-page-heading">
-          <div>
-            <h1>Dodaj nowy tytuł</h1>
-            <p>Uzupełnij wszystkie informacje o tytule przed jego dodaniem.</p>
-          </div>
+        <div class="panel-heading add-title-heading">
+          <h1>Dodaj nowy tytuł</h1>
+          <p>Uzupełnij wszystkie informacje o tytule.</p>
         </div>
 
-        <form id="addTitleForm" class="series-editor-form add-title-form">
+        <form id="addTitleForm" class="form-shell add-title-editor">
           <div class="two-columns">
             <label>
               Tytuł
@@ -230,14 +228,14 @@
 
           <label class="checkbox-row editor-adult-check">
             <input id="newTitleAdult" name="adult" type="checkbox">
-            Pokaż jako tytuł 18+
+            <span>Tytuł 18+</span>
           </label>
 
           <div class="media-edit-grid">
             <div class="media-editor-card">
               <div class="media-editor-label"><b>Okładka</b><span>3:4</span></div>
               <div class="media-preview cover-preview">
-                <img id="newTitleCoverPreview" src="" alt="Podgląd okładki">
+                <img id="newTitleCoverPreview" alt="Podgląd okładki">
                 <span class="media-preview-empty">Brak wybranego zdjęcia</span>
               </div>
               <label class="file-picker">
@@ -249,7 +247,7 @@
             <div class="media-editor-card">
               <div class="media-editor-label"><b>Baner</b><span>16:9</span></div>
               <div class="media-preview banner-preview">
-                <img id="newTitleBannerPreview" src="" alt="Podgląd baneru">
+                <img id="newTitleBannerPreview" alt="Podgląd baneru">
                 <span class="media-preview-empty">Brak wybranego zdjęcia</span>
               </div>
               <label class="file-picker">
@@ -261,7 +259,7 @@
 
           <label>
             Opis
-            <textarea id="newTitleDescription" name="description" rows="7" required placeholder="Opis tytułu..."></textarea>
+            <textarea id="newTitleDescription" name="description" rows="6" required placeholder="Opis tytułu..."></textarea>
           </label>
 
           <div class="two-columns">
@@ -289,7 +287,7 @@
 
           <label>
             Gatunki
-            <input id="newTitleGenres" name="genres" placeholder="Romans, Dramat, Fantasy">
+            <input id="newTitleGenres" name="genres" required placeholder="Romans, Dramat, Fantasy">
           </label>
 
           <div class="people-editor-section">
@@ -301,17 +299,17 @@
               <div class="person-editor-row" data-person-row>
                 <input data-person-name placeholder="Nazwa">
                 <input data-person-url placeholder="Link do profilu (opcjonalnie)" type="url">
-                <select data-person-status><option value="profile">Profil</option><option value="none">Brak profilu</option><option value="unknown">Nieznany</option></select>
+                <select data-person-status>
+                  <option value="profile">Profil</option>
+                  <option value="none">Brak profilu</option>
+                  <option value="unknown">Nieznany</option>
+                </select>
                 <button class="icon-button is-small" type="button" data-remove-new-person aria-label="Usuń osobę">×</button>
               </div>
             </div>
-            <div class="pretty-check-grid">
-              <label class="pretty-check">
-                <input id="authorUnknown" type="checkbox">
-                <span class="pretty-check-box"></span>
-                <span>Nieznany</span>
-              </label>
-            </div>
+            <label class="checkbox-row">
+              <input id="authorUnknown" type="checkbox"> Nieznany
+            </label>
           </div>
 
           <div class="people-editor-section">
@@ -323,25 +321,26 @@
               <div class="person-editor-row" data-person-row>
                 <input data-person-name placeholder="Nazwa">
                 <input data-person-url placeholder="Link do profilu (opcjonalnie)" type="url">
-                <select data-person-status><option value="profile">Profil</option><option value="none">Brak profilu</option><option value="unknown">Nieznany</option></select>
+                <select data-person-status>
+                  <option value="profile">Profil</option>
+                  <option value="none">Brak profilu</option>
+                  <option value="unknown">Nieznany</option>
+                </select>
                 <button class="icon-button is-small" type="button" data-remove-new-person aria-label="Usuń osobę">×</button>
               </div>
             </div>
-            <div class="pretty-check-grid">
-              <label class="pretty-check">
-                <input id="artistUnknown" type="checkbox">
-                <span class="pretty-check-box"></span>
-                <span>Nieznany</span>
-              </label>
-            </div>
+            <label class="checkbox-row">
+              <input id="artistUnknown" type="checkbox"> Nieznany
+            </label>
           </div>
 
           <div class="people-editor-section">
             <div class="editor-section-heading">
               <h3>Tłumacze</h3>
-              <span class="editor-help">Wybierz osoby posiadające rolę Tłumacz.</span>
+              <span class="editor-help">Wybierz osoby posiadające rolę „Tłumacz”.</span>
             </div>
             <div class="pretty-check-grid" id="newTitleTranslatorChecks"></div>
+            <select id="newTitleTranslators" multiple required class="is-hidden"></select>
           </div>
 
           <div class="people-editor-section">
@@ -350,6 +349,7 @@
               <span class="editor-help">Dla każdej funkcji wybierz osobę albo „Brak”.</span>
             </div>
             <div class="editor-pickers-grid" id="newTitleEditorPickers"></div>
+            <input id="newTitleEditors" class="is-hidden">
           </div>
 
           <div class="inline-editor-actions">
