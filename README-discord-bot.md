@@ -1,56 +1,70 @@
-# Discord bot dla BunBun
+# BunBun Translations — bot + strona
 
-Ten backend robi trzy rzeczy:
+W tej wersji bot Discord jest zintegrowany z backendem strony. Nie trzeba uruchamiać osobnego procesu dla samego bota: `server.js` uruchamia `discord.js`, obsługuje OAuth i API strony.
 
-- logowanie przez Discord OAuth (`/api/auth/discord/start`, `/api/auth/me`, `/api/auth/logout`),
-- pobieranie liczby osób z kanału Discord (`/api/discord/stats`),
-- pobieranie nazwy i avatara użytkownika po ID konta (`/api/discord/users/:id`).
+## Co robi bot
 
-## Uruchomienie
+- wysyła nowe rozdziały do kanału przypisanego do tytułu,
+- po wysłaniu odczytuje wiadomość i wszystkie załączone panele,
+- pobiera panele z Discorda i zapisuje je w `assets/chapters/<tytuł>/<rozdział>/`,
+- zapisuje rozdział do `data/chapters.json`, skąd strona pobiera go przez `/api/chapters`,
+- odczytuje liczbę osób z nazwy wskazanego kanału,
+- liczy osoby posiadające rolę Tłumacz,
+- po logowaniu przez Discord pobiera aktualną nazwę użytkownika, avatar, banner i role,
+- dla członków kadry pobiera te same dane bez potrzeby ręcznego wpisywania avatara lub bannera.
 
-1. Zainstaluj zależności:
+## Jak działa dodawanie rozdziału
+
+1. Administrator lub przypisany tłumacz otwiera `Dodaj nowy rozdział`.
+2. Wybiera tytuł, numer rozdziału, tłumaczy i panele.
+3. Strona wysyła dane do backendu.
+4. Backend pobiera ID kanału z konfiguracji tytułu.
+5. Bot wysyła do tego kanału wiadomość zawierającą informacje o rozdziale oraz wszystkie panele jako załączniki.
+6. Bot nasłuchuje swojej wiadomości `BUNBUN_CHAPTER ...`, pobiera załączniki z Discorda i zapisuje je lokalnie.
+7. Rozdział pojawia się na stronie przez `/api/chapters`.
+
+Dzięki temu Discord jest faktycznym miejscem publikacji, a strona jest zasilana z wiadomości wysłanej przez bota.
+
+## Konfiguracja tytułu
+
+Każdy tytuł ma pole `channelId`. To ID kanału, do którego bot ma wysyłać rozdziały tego tytułu. Pole można uzupełnić w `Edytuj tytuł`.
+
+## Role i uprawnienia
+
+Backend sprawdza role Discorda po stronie serwera:
+
+- `Właściciel` / `Współwłaściciel` / `Administrator` — mogą zarządzać tytułami i publikować rozdziały,
+- `Tłumacz` — może publikować rozdział tylko do tytułu, w którym znajduje się jego Discord ID na liście tłumaczy.
+
+Nazwy ról mogą być zmienione bez przebudowy kodu tylko wtedy, gdy zachowasz te nazwy. Jeśli chcesz używać ID ról zamiast nazw, można to później przenieść do `.env`.
+
+## Liczniki
+
+`DISCORD_COUNT_CHANNEL_ID` wskazuje kanał, którego nazwa zawiera liczbę osób, np. `👥・1234`. Backend odczytuje pierwszą liczbę z nazwy.
+
+`DISCORD_TRANSLATOR_ROLE_ID` wskazuje rolę Tłumacz. Backend pobiera członków serwera i liczy osoby posiadające tę rolę.
+
+## OAuth Discord
+
+W Discord Developer Portal ustaw redirect:
+
+`http://localhost:3000/api/auth/discord/callback`
+
+lub odpowiedni adres produkcyjny.
+
+Zakres OAuth to `identify`, a dane profilu są dodatkowo odświeżane przez bota z serwera Discord.
+
+## Instalacja
 
 ```bash
 npm install
-```
-
-2. Skopiuj `.env.example` do `.env` i uzupełnij wartości.
-
-3. W Discord Developer Portal utwórz aplikację i bota.
-
-4. Włącz botowi privileged intent `Server Members Intent`, bo licznik roli `Tłumacz` wymaga pobrania członków serwera.
-
-5. Dodaj redirect OAuth:
-
-```text
-http://localhost:3000/api/auth/discord/callback
-```
-
-6. Zaproś bota na serwer z uprawnieniami do odczytu serwera, kanałów i członków.
-
-7. Uruchom:
-
-```bash
 npm start
 ```
 
-8. Otwórz:
+Przed uruchomieniem uzupełnij `.env` na podstawie `.env.example`.
 
-```text
-http://localhost:3000
-```
+Bot potrzebuje co najmniej dostępu do serwera, kanałów, wysyłania wiadomości, załączników oraz `Server Members Intent`.
 
-## Licznik osób
+## Ważne — tokeny
 
-W panelu `Dane` wpisujesz ID kanału, którego nazwa zawiera liczbę osób, np. `osoby-1234` albo `👥・1234`. Backend odczyta pierwszą liczbę z nazwy kanału. Jeśli kanał nie ma liczby, backend spróbuje użyć `guild.memberCount`.
-
-## Ważne
-
-Nie wpisuj tokenu bota ani Client Secret do plików frontendu. One mają być tylko w `.env` na serwerze.
-
-
-## Publikowanie rozdziałów z bota
-
-Strona udostępnia `GET /api/chapters`, z którego frontend pobiera opublikowane rozdziały co 15 sekund. Bot może publikować rozdział przez `POST /api/chapters/publish` z JSON-em `{ "titleId": "...", "titleName": "...", "chapter": { ... } }`. `titleId` powinno odpowiadać ID serii na stronie; `titleName` jest dodatkowym zabezpieczeniem, dzięki któremu frontend może dopasować serię także po jej nazwie. Jeśli ustawisz `BUNBUN_CONTENT_SYNC_KEY` w `.env`, bot powinien wysyłać ten sam klucz w nagłówku `x-bunbun-sync-key`.
-
-W obecnym projekcie kod bota nie znajduje się w archiwum, więc samo API nie może automatycznie wiedzieć o rozdziałach dodawanych wyłącznie przez Discorda, dopóki bot nie wyśle ich na ten endpoint.
+Nie umieszczaj tokenu bota ani Client Secret w frontendzie, GitHubie ani ZIP-ie przeznaczonym do publikacji. Jeśli token znalazł się w starym pliku `.env`, należy go **unieważnić i wygenerować nowy** w Discord Developer Portal.
