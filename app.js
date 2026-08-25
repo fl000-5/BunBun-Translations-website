@@ -635,12 +635,8 @@
     const title = findTitle(titleId);
     if (!title) throw new Error("Nie znaleziono wybranego tytułu.");
 
-    // Upewnij się, że najnowsze ustawienia tytułu (w tym ID kanału)
-    // są zapisane na backendzie przed publikacją rozdziału.
-    const saved = await saveTitleToServer(title, false);
-    if (!saved) {
-      throw new Error("Nie udało się zapisać ustawień tytułu na serwerze.");
-    }
+    // Aktualne dane tytułu są wysyłane razem z publikacją.
+    // Backend zapisze je przed wysłaniem paneli na Discorda.
 
     const response = await fetch(apiUrl(CHAPTER_PUBLISH), {
       method: "POST",
