@@ -12,6 +12,8 @@ const port = Number(process.env.PORT || 3000);
 const root = __dirname;
 const dataDir = path.join(root, "data");
 const chaptersFile = path.join(dataDir, "chapters.json");
+const titlesFile = path.join(dataDir, "titles.json");
+const chapterAssetsDir = path.join(root, "assets", "chapters");
 const apiVersion = "v10";
 
 const config = {
@@ -69,7 +71,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "100mb" }));
 app.use(session({
   secret: config.sessionSecret,
   resave: false,
@@ -168,43 +170,93 @@ app.post("/api/auth/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
+app.get("/api/titles", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ titles: readTitles() });
+});
+
+app.post("/api/titles", requireSiteRole(["Właściciel", "Współwłaściciel", "Administrator"]), (req, res) => {
+  const title = sanitizeTitle(req.body?.title);
+  if (!title?.id || !title.title) return res.status(400).json({ error: "invalid_title" });
+  const titles = readTitles();
+  const index = titles.findIndex((item) => item.id === title.id);
+  if (index >= 0) titles[index] = title;
+  else titles.push(title);
+  writeTitles(titles);
+  res.json({ ok: true, title });
+});
+
+app.put("/api/titles/:id", requireSiteRole(["Właściciel", "Współwłaściciel", "Administrator"]), (req, res) => {
+  const title = sanitizeTitle({ ...(req.body?.title || {}), id: req.params.id });
+  if (!title?.id || !title.title) return res.status(400).json({ error: "invalid_title" });
+  const titles = readTitles();
+  const index = titles.findIndex((item) => item.id === title.id);
+  if (index < 0) titles.push(title);
+  else titles[index] = title;
+  writeTitles(titles);
+  res.json({ ok: true, title });
+});
+
+app.delete("/api/titles/:id", requireSiteRole(["Właściciel", "Współwłaściciel"]), (req, res) => {
+  const titles = readTitles();
+  const next = titles.filter((item) => item.id !== req.params.id);
+  if (next.length === titles.length) return res.status(404).json({ error: "title_not_found" });
+  writeTitles(next);
+  const dir = path.join(chapterAssetsDir, req.params.id);
+  fs.rmSync(dir, { recursive: true, force: true });
+  res.json({ ok: true });
+});
+
 app.get("/api/chapters", (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.json({ chapters: readPublishedChapters() });
 });
 
-app.post("/api/chapters/publish", (req, res) => {
-  const syncKey = String(process.env.BUNBUN_CONTENT_SYNC_KEY || "").trim();
-  if (syncKey && req.get("x-bunbun-sync-key") !== syncKey) {
-    res.status(401).json({ error: "invalid_sync_key" });
-    return;
-  }
+app.post("/api/chapters/publish", requireSiteRole(["Właściciel", "Współwłaściciel", "Administrator", "Tłumacz"]), async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const titleId = String(body.titleId || "").trim();
+    const titleName = String(body.titleName || "").trim();
+    const chapter = body.chapter;
+    if (!titleId || !chapter?.id) return res.status(400).json({ error: "titleId_and_chapter_id_required" });
 
-  const body = req.body || {};
-  const chapter = body.chapter;
-  const titleId = String(body.titleId || body.titleSlug || body.title?.id || "").trim();
-  const titleName = String(body.titleName || body.title?.name || body.title?.title || "").trim();
-  if (!titleId || !chapter?.id) {
-    res.status(400).json({ error: "titleId_and_chapter_id_required" });
-    return;
-  }
-
-  const chapters = readPublishedChapters();
-  const index = chapters.findIndex((item) => item.chapter?.id === chapter.id);
-  const entry = {
-    titleId,
-    ...(titleName ? { titleName } : {}),
-    chapter: {
-      ...chapter,
-      id: String(chapter.id),
-      date: chapter.date || new Date().toISOString(),
-      likes: Number(chapter.likes) || 0
+    const title = readTitles().find((item) => item.id === titleId);
+    if (!title) return res.status(404).json({ error: "title_not_found" });
+    const member = await getRequestMember(req);
+    const isAdmin = hasAnyDiscordRole(member, ["Właściciel", "Współwłaściciel", "Administrator"]);
+    if (!isAdmin && !title.translators.includes(req.session.user.id)) {
+      return res.status(403).json({ error: "not_assigned_to_title" });
     }
-  };
-  if (index >= 0) chapters[index] = entry;
-  else chapters.push(entry);
-  writePublishedChapters(chapters);
-  res.json({ ok: true });
+    if (!title.channelId) return res.status(400).json({ error: "title_channel_id_missing" });
+    if (!discordClient) return res.status(500).json({ error: "discord_not_configured" });
+    await discordReady;
+
+    const pages = Array.isArray(chapter.pages) ? chapter.pages : [];
+    const savedPages = await saveChapterPages(titleId, String(chapter.id), pages);
+    const publishedChapter = sanitizeChapter({ ...chapter, pages: savedPages, cover: title.cover }, title);
+
+    const channel = await discordClient.channels.fetch(title.channelId).catch(() => null);
+    if (!channel || !channel.isTextBased() || !channel.send) return res.status(400).json({ error: "title_channel_not_found_or_not_text" });
+
+    const files = savedPages.map((file) => ({ attachment: path.join(root, file.replace(/^\//, "")), name: path.basename(file) }));
+    const embed = {
+      color: 0xf391ca,
+      title: `${title.title} · ${publishedChapter.number}`,
+      description: publishedChapter.title || "Nowy rozdział",
+      fields: [
+        { name: "ID tytułu", value: title.id, inline: true },
+        { name: "ID rozdziału", value: publishedChapter.id, inline: true },
+        { name: "Tłumacze", value: (publishedChapter.translators || []).join(", ") || "Brak", inline: false }
+      ],
+      footer: { text: "BunBun|chapter" },
+      timestamp: publishedChapter.date || new Date().toISOString()
+    };
+
+    const message = await channel.send({ content: `BUNBUN_CHAPTER ${title.id} ${publishedChapter.id}`, embeds: [embed], files });
+    res.json({ ok: true, queued: true, messageId: message.id, chapter: publishedChapter });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/discord/stats", async (req, res, next) => {
@@ -239,9 +291,155 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: error.message || "server_error" });
 });
 
+
+if (discordClient) {
+  discordClient.on("messageCreate", async (message) => {
+    if (!message.author?.bot || !message.content.startsWith("BUNBUN_CHAPTER ")) return;
+    try {
+      const parts = message.content.trim().split(/\s+/);
+      const titleId = parts[1];
+      const chapterId = parts[2];
+      if (!titleId || !chapterId) return;
+      const title = readTitles().find((item) => item.id === titleId);
+      if (!title) return;
+
+      const chapter = {
+        id: chapterId,
+        number: message.embeds[0]?.title?.split(" · ").slice(1).join(" · ") || "Rozdział",
+        title: message.embeds[0]?.description || "Nowy rozdział",
+        season: "",
+        date: message.createdAt.toISOString(),
+        likes: 0,
+        cover: title.cover,
+        translators: parseTranslatorIds(message.embeds[0]?.fields?.find((field) => field.name === "Tłumacze")?.value),
+        pages: []
+      };
+      const attachments = Array.from(message.attachments.values()).sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      const chapterDir = path.join(chapterAssetsDir, titleId, chapterId);
+      fs.mkdirSync(chapterDir, { recursive: true });
+      for (let i = 0; i < attachments.length; i += 1) {
+        const attachment = attachments[i];
+        const ext = path.extname(attachment.name || ".jpg") || ".jpg";
+        const filename = `${String(i + 1).padStart(3, "0")}${ext}`;
+        const target = path.join(chapterDir, filename);
+        await downloadFile(attachment.url, target);
+        chapter.pages.push(`/assets/chapters/${encodeURIComponent(titleId)}/${encodeURIComponent(chapterId)}/${filename}`);
+      }
+      if (!chapter.pages.length) return;
+
+      const chapters = readPublishedChapters();
+      const entry = { titleId, titleName: title.title, chapter: sanitizeChapter(chapter, title) };
+      const index = chapters.findIndex((item) => item.chapter?.id === chapterId);
+      if (index >= 0) chapters[index] = entry;
+      else chapters.push(entry);
+      writePublishedChapters(chapters);
+    } catch (error) {
+      console.error("Nie udało się przetworzyć rozdziału z Discorda:", error);
+    }
+  });
+}
+
 app.listen(port, () => {
   console.log(`BunBun działa na http://localhost:${port}`);
 });
+
+
+function readTitles() {
+  try {
+    if (!fs.existsSync(titlesFile)) return [];
+    const parsed = JSON.parse(fs.readFileSync(titlesFile, "utf8"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function writeTitles(titles) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(titlesFile, JSON.stringify(titles, null, 2), "utf8");
+}
+
+function sanitizeTitle(title) {
+  if (!title || typeof title !== "object") return null;
+  return {
+    id: String(title.id || "").trim(),
+    title: String(title.title || "").trim(),
+    type: String(title.type || "Manhwa"),
+    status: String(title.status || "Aktywna"),
+    genres: Array.isArray(title.genres) ? title.genres.map(String) : [],
+    adult: Boolean(title.adult),
+    channelId: String(title.channelId || "").trim(),
+    cover: String(title.cover || ""),
+    banner: String(title.banner || ""),
+    description: String(title.description || ""),
+    authors: Array.isArray(title.authors) ? title.authors : [],
+    artists: Array.isArray(title.artists) ? title.artists : [],
+    translators: Array.isArray(title.translators) ? title.translators.map(String) : [],
+    editors: Array.isArray(title.editors) ? title.editors : [],
+    chapters: Array.isArray(title.chapters) ? title.chapters : []
+  };
+}
+
+function sanitizeChapter(chapter, title) {
+  return {
+    id: String(chapter.id),
+    number: String(chapter.number || "Rozdział"),
+    title: String(chapter.title || "Nowy rozdział"),
+    season: String(chapter.season || ""),
+    date: chapter.date || new Date().toISOString(),
+    likes: Number(chapter.likes) || 0,
+    cover: chapter.cover || title.cover || "",
+    translators: Array.isArray(chapter.translators) ? chapter.translators.map(String) : (title.translators || []),
+    pages: Array.isArray(chapter.pages) ? chapter.pages.map(String) : []
+  };
+}
+
+async function saveChapterPages(titleId, chapterId, pages) {
+  const dir = path.join(chapterAssetsDir, titleId, chapterId);
+  fs.mkdirSync(dir, { recursive: true });
+  const saved = [];
+  for (let i = 0; i < pages.length; i += 1) {
+    const page = String(pages[i] || "");
+    const match = page.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i);
+    if (!match) continue;
+    const ext = match[1].toLowerCase().replace("jpeg", "jpg");
+    const filename = `${String(i + 1).padStart(3, "0")}.${ext}`;
+    fs.writeFileSync(path.join(dir, filename), Buffer.from(match[2], "base64"));
+    saved.push(`/assets/chapters/${encodeURIComponent(titleId)}/${encodeURIComponent(chapterId)}/${filename}`);
+  }
+  return saved;
+}
+
+function parseTranslatorIds(value) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function hasAnyDiscordRole(member, names) {
+  return Boolean(member && names.some((name) => member.roles.cache.some((role) => role.name === name)));
+}
+
+async function getRequestMember(req) {
+  if (!req.session.user?.id || !config.guildId || !discordClient) return null;
+  const guild = await getGuild();
+  return guild.members.fetch(req.session.user.id).catch(() => null);
+}
+
+function requireSiteRole(names) {
+  return async (req, res, next) => {
+    try {
+      if (!req.session.user?.id) return res.status(401).json({ error: "not_logged_in" });
+      const member = await getRequestMember(req);
+      if (!hasAnyDiscordRole(member, names)) return res.status(403).json({ error: "insufficient_discord_role" });
+      req.discordMember = member;
+      next();
+    } catch (error) { next(error); }
+  };
+}
+
+async function downloadFile(url, target) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`attachment_download_${response.status}`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(target, buffer);
+}
 
 function readPublishedChapters() {
   try {

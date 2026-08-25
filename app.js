@@ -9,6 +9,7 @@
   const DISCORD_USER = "/api/discord/users/";
   const CHAPTER_FEED = "/api/chapters";
   const CHAPTER_PUBLISH = "/api/chapters/publish";
+  const TITLES_API = "/api/titles";
   const API_BASE = String(window.BUNBUN_API_BASE || "").replace(/\/$/, "");
   const SAMPLE_COVER = "assets/unsleep-cover.jpg";
   const SAMPLE_PAGE_1 = "assets/unsleep-1.jpg";
@@ -179,15 +180,16 @@
 
   document.addEventListener("DOMContentLoaded", init);
 
-  function init() {
+  async function init() {
     bindNavigation();
     bindLogin();
     bindFilters();
     bindTeam();
     bindForms();
     hydrateConfigForm();
-    initDiscordSession();
+    await initDiscordSession();
     renderAll();
+    await syncTitlesFromServer();
     syncPublishedChapters();
     window.setInterval(syncPublishedChapters, 15000);
     route();
@@ -519,6 +521,43 @@
     state.currentUser = userId;
     persistState();
     renderAll();
+  }
+
+  async function syncTitlesFromServer() {
+    if (!hasBackend()) return;
+    try {
+      const response = await fetch(apiUrl(TITLES_API), { credentials: "include", cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const remote = Array.isArray(data.titles) ? data.titles : [];
+      if (remote.length) {
+        state.translations = remote;
+        state.translations.forEach(normalizeTitlePeople);
+        persistState();
+        renderAll();
+      } else if (canManageTitles() && state.translations.length) {
+        await Promise.all(state.translations.map((title) => saveTitleToServer(title, false)));
+      }
+    } catch (error) {
+      console.warn("Nie udało się zsynchronizować tytułów:", error);
+    }
+  }
+
+  async function saveTitleToServer(title, showError = true) {
+    if (!hasBackend() || !title) return false;
+    try {
+      const response = await fetch(apiUrl(`${TITLES_API}/${encodeURIComponent(title.id)}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title })
+      });
+      if (!response.ok) throw new Error(`title_save_${response.status}`);
+      return true;
+    } catch (error) {
+      if (showError) alert("Nie udało się zapisać tytułu na serwerze.");
+      return false;
+    }
   }
 
   async function syncPublishedChapters() {
@@ -1176,6 +1215,7 @@
 
     normalizeTitlePeople(title);
     persistState();
+    await saveTitleToServer(title);
     renderAll();
     renderTitle(title.id);
     const freshEditor = document.querySelector("#inlineSeriesEditor");
@@ -1197,7 +1237,7 @@
     });
   }
 
-  function handleDeleteTitleFromDetail(titleId) {
+  async function handleDeleteTitleFromDetail(titleId) {
     if (!canDeleteSeries()) return;
     const title = findTitle(titleId);
     if (!title) return;
@@ -1225,11 +1265,14 @@
     };
     modal.querySelector("[data-delete-no]")?.addEventListener("click", close);
     modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
-    modal.querySelector("[data-delete-yes]")?.addEventListener("click", () => {
+    modal.querySelector("[data-delete-yes]")?.addEventListener("click", async () => {
       state.translations = state.translations.filter((item) => item.id !== titleId);
       state.library = state.library.filter((id) => id !== titleId);
       if (state.randomTitleId === titleId) state.randomTitleId = null;
       close();
+      if (hasBackend()) {
+        await fetch(apiUrl(`${TITLES_API}/${encodeURIComponent(titleId)}`), { method: "DELETE", credentials: "include" }).catch(() => null);
+      }
       persistState();
       renderAll();
       navigate("translations");
@@ -1499,6 +1542,7 @@
     }
 
     state.translations.push(newTitle);
+    await saveTitleToServer(newTitle);
     event.target.reset();
     persistState();
     renderAll();
