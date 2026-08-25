@@ -791,8 +791,7 @@
                         class="latest-chapter-link"
                         data-open-reader-title="${escapeAttr(title.id)}"
                         data-open-reader-chapter="${escapeAttr(chapter.id)}">
-                  <span>${escapeHtml(chapterDisplayName(chapter))}</span>
-                  <span>${escapeHtml(formatDate(chapter.date))}</span>
+                  <span>${escapeHtml(chapterDisplayName(chapter))} ・ ${escapeHtml(formatDate(chapter.date))}</span>
                 </button>
               `).join("")}
             </div>

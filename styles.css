@@ -1000,3 +1000,44 @@ body > main { flex:1 0 auto; width:100%; }
     min-height:26px;
   }
 }
+
+/* ===== Linki do nowych rozdziałów ===== */
+.latest-chapter-link {
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-height:32px;
+  box-sizing:border-box;
+  padding:5px 9px;
+  border:1px solid #f2b7d8;
+  border-radius:7px;
+  background:#fff8fc;
+  color:var(--ink);
+  text-decoration:underline;
+  text-decoration-thickness:1px;
+  text-underline-offset:2px;
+  font-size:.9rem;
+  font-weight:800;
+  text-align:left;
+  cursor:pointer;
+  transition:color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+
+.latest-chapter-link:hover {
+  color:var(--pink-deep) !important;
+  background:#fff0f8 !important;
+  border-color:#e9a2c9;
+  text-decoration-color:var(--pink-deep);
+}
+
+.latest-chapter-link:focus,
+.latest-chapter-link:focus-visible {
+  outline:none !important;
+  box-shadow:none !important;
+}
+
+.latest-chapter-link span {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
