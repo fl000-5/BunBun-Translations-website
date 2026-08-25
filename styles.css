@@ -1108,3 +1108,37 @@ body > main { flex:1 0 auto; width:100%; }
   line-height: 1.25;
   padding: 12px !important;
 }
+
+/* Biblioteczka = dokładnie ten sam układ kafelków co „Tłumaczone tytuły” */
+.library-grid.translated-title-grid {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+  gap: 18px !important;
+}
+
+.library-grid.translated-title-grid .library-item {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-rows: auto auto !important;
+  align-content: start !important;
+}
+
+.library-grid.translated-title-grid .library-cover {
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+}
+
+.library-grid.translated-title-grid .library-item h3 {
+  min-height: 3.1em !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 12px 10px 15px !important;
+  font-size: 1.15rem !important;
+  line-height: 1.25 !important;
+}
