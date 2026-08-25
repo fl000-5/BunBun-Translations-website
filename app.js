@@ -744,12 +744,16 @@
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
     const latestTitles = state.translations
-      .map((title) => ({
-        title,
-        latestDate: title.chapters.length
-          ? Math.max(...title.chapters.map((chapter) => new Date(chapter.date).getTime() || 0))
-          : 0
-      }))
+      .map((title) => {
+        const latestChapter = title.chapters
+          .slice()
+          .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))[0];
+
+        return {
+          title,
+          latestDate: latestChapter ? (new Date(latestChapter.date).getTime() || 0) : 0
+        };
+      })
       .filter((item) => item.latestDate > 0 && now - item.latestDate <= sevenDays)
       .sort((a, b) => b.latestDate - a.latestDate)
       .slice(0, 6);
@@ -760,26 +764,39 @@
     }
 
     grid.innerHTML = latestTitles.map(({ title }) => {
-      const chapterRows = title.chapters
+      const chapters = title.chapters
         .slice()
         .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
-        .slice(0, 3)
-        .map((chapter) => `
-          <button type="button" class="latest-chapter-link" data-open-reader-title="${escapeAttr(title.id)}" data-open-reader-chapter="${escapeAttr(chapter.id)}">
-            <span class="latest-chapter-number">${escapeHtml(chapterDisplayName(chapter))}</span>
-            <span class="latest-chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
-          </button>
-        `).join("");
+        .slice(0, 3);
 
       return `
         <article class="latest-card">
-          <button class="latest-title-button" type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
+          <button type="button"
+                  class="latest-cover-link"
+                  data-open-title="${escapeAttr(title.id)}"
+                  aria-label="Otwórz ${escapeAttr(title.title)}">
             <img src="${escapeAttr(title.cover)}" alt="">
-            <div class="latest-card-body">
-              <h3>${escapeHtml(title.title)}</h3>
-            </div>
           </button>
-          <div class="latest-chapters">${chapterRows}</div>
+
+          <div class="latest-card-content">
+            <button type="button"
+                    class="latest-title-link"
+                    data-open-title="${escapeAttr(title.id)}">
+              ${escapeHtml(title.title)}
+            </button>
+
+            <div class="latest-chapter-list">
+              ${chapters.map((chapter) => `
+                <button type="button"
+                        class="latest-chapter-link"
+                        data-open-reader-title="${escapeAttr(title.id)}"
+                        data-open-reader-chapter="${escapeAttr(chapter.id)}">
+                  <span>${escapeHtml(chapterDisplayName(chapter))}</span>
+                  <span>${escapeHtml(formatDate(chapter.date))}</span>
+                </button>
+              `).join("")}
+            </div>
+          </div>
         </article>
       `;
     }).join("");
@@ -787,9 +804,11 @@
     grid.querySelectorAll("[data-open-title]").forEach((button) => {
       button.addEventListener("click", () => openTitle(button.dataset.openTitle));
     });
+
     grid.querySelectorAll("[data-open-reader-chapter]").forEach((button) => {
       button.addEventListener("click", () => {
-        location.hash = `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
+        location.hash =
+          `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
       });
     });
   }
