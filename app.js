@@ -77,7 +77,7 @@
     titleQuery: "",
     randomTitleId: null,
     uploadedPages: [],
-    profileDescription: "Tu możesz zapisać swój opis profilu.",
+    profileDescription: "",
     discordSettings: {
       clientId: "",
       redirectUri: "https://twojadomena.pl/api/auth/discord/callback",
@@ -1513,7 +1513,15 @@
   }
 
   function getPeopleForChapterEditor(title) {
-    const ids = new Set(getTeamPeople().map((user) => user.id));
+    const ids = new Set();
+    state.team
+      .filter((member) => member.status === "current")
+      .forEach((member) => {
+        const user = state.users[member.discordId];
+        if (user && user.roles?.some((role) =>
+          ["Właściciel", "Współwłaściciel", "Tłumacz", "Pomocnik tłumacza"].includes(role)
+        )) ids.add(member.discordId);
+      });
     (title.translators || []).forEach((id) => ids.add(id));
     normalizeEditors(title.editors).forEach((editor) => { if (editor.userId) ids.add(editor.userId); });
     return Array.from(ids).map((id) => state.users[id] || placeholderUser(id));
@@ -1579,7 +1587,7 @@
         <form id="chapterEditForm" class="chapter-edit-form">
           <label>
             Nazwa rozdziału
-            <input name="title" type="text" value="${escapeAttr(chapter.title || "")}" placeholder="np. Spotkanie">
+            <input name="title" type="text" value="${escapeAttr(chapter.title && chapter.title !== "Nowy rozdział" ? chapter.title : "")}" placeholder="np. Spotkanie">
           </label>
           <div class="chapter-edit-two-columns">
             <label>
@@ -1631,7 +1639,7 @@
       const data = new FormData(form);
       const updated = {
         ...chapter,
-        number: `Rozdział ${String(data.get("number") || "").trim()}`,
+        number: String(data.get("number") || "").trim(),
         title: String(data.get("title") || "").trim(),
         season: String(data.get("season") || "").trim(),
         date: data.get("date") ? `${data.get("date")}T00:00:00.000Z` : chapter.date,
@@ -1794,12 +1802,13 @@
       return;
     }
 
-    const libraryTitles = state.library.map(findTitle).filter(Boolean);
-    const translated = state.translations.filter((title) => title.translators.includes(user.id));
+    const translated = user.roles.includes("Tłumacz")
+      ? state.translations.filter((title) => title.translators.includes(user.id))
+      : [];
 
     container.innerHTML = `
       <article class="profile-shell">
-        <div class="profile-banner"><img src="${escapeAttr(user.banner)}" alt=""></div>
+        <div class="profile-banner"><img src="${escapeAttr(user.banner || "")}" alt=""></div>
         <div class="profile-body">
           <div class="profile-header-row">
             <img class="profile-avatar" src="${escapeAttr(user.avatar)}" alt="">
@@ -1809,36 +1818,23 @@
               <div class="tag-row">${user.roles.map((role) => `<span class="tag">${escapeHtml(role)}</span>`).join("")}</div>
             </div>
           </div>
-
-          <div class="profile-content">
-            <section class="profile-tile profile-description">
-              <h2>Opis</h2>
-              <textarea id="profileDescriptionInput" placeholder="">${escapeHtml(state.profileDescription || "")}</textarea>
-              <button class="primary-button" type="button" id="saveProfileDescription">Zapisz opis</button>
-            </section>
-
-            ${translated.length ? `
-              <section class="profile-tile">
-                <h2>Tłumaczone tytuły</h2>
-                <div class="library-grid">
-                  ${translated.map((title) => `
-                    <button class="library-item" type="button" data-profile-title="${escapeAttr(title.id)}">
-                      <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
-                      <h3>${escapeHtml(title.title)}</h3>
-                    </button>
-                  `).join("")}
-                </div>
-              </section>
-            ` : ""}
-          </div>
         </div>
       </article>
-    `;
 
-    container.querySelector("#saveProfileDescription").addEventListener("click", () => {
-      state.profileDescription = document.querySelector("#profileDescriptionInput").value;
-      persistState();
-    });
+      ${translated.length ? `
+        <section class="profile-translated-section">
+          <h2>Tłumaczone tytuły</h2>
+          <div class="library-grid translated-title-grid">
+            ${translated.map((title) => `
+              <button class="library-item" type="button" data-profile-title="${escapeAttr(title.id)}">
+                <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
+                <h3>${escapeHtml(title.title)}</h3>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+      ` : ""}
+    `;
     container.querySelectorAll("[data-profile-title]").forEach((button) => {
       button.addEventListener("click", () => openTitle(button.dataset.profileTitle));
     });

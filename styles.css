@@ -638,3 +638,19 @@ body.modal-open::before {
 .profile-names { padding-top: 70px; padding-bottom: 16px; }
 .profile-names h1, .profile-names p { overflow-wrap: anywhere; }
 #libraryDetail { margin-top: 18px; }
+
+.profile-translated-section { max-width: 1280px; margin: 30px auto 0; text-align: center; }
+.profile-translated-section h2 { margin: 0 0 18px; color: #0f0b0f; font-size: clamp(1.7rem, 3vw, 2.5rem); font-weight: 950; }
+.translated-title-grid { text-align: left; }
+.discord-social-link svg { width: 21px; height: 21px; display: block; }
+
+/* Chapter editor: scrollable dialog body with a polished date picker. */
+.chapter-edit-modal { max-height: min(86vh, 820px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--pink) #fff0f8; border-radius: 18px; }
+.chapter-edit-modal::-webkit-scrollbar { width: 10px; }
+.chapter-edit-modal::-webkit-scrollbar-track { margin: 10px 3px; border-radius: 999px; background: #fff0f8; }
+.chapter-edit-modal::-webkit-scrollbar-thumb { border: 3px solid #fff0f8; border-radius: 999px; background: var(--pink); }
+.chapter-edit-form input[type="date"] { appearance: none; -webkit-appearance: none; min-height: 48px; padding-right: 48px; }
+.chapter-edit-form input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; inset: 0; width: 100%; cursor: pointer; }
+.date-input-wrap { position: relative; display: block; }
+.date-input-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; border: 2px solid var(--pink-deep); border-radius: 4px; box-sizing: border-box; }
+.date-input-wrap::before { content: ""; position: absolute; z-index: 1; right: 17px; top: calc(50% - 5px); width: 12px; height: 2px; background: var(--pink-deep); pointer-events: none; }
