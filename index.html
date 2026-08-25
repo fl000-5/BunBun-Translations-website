@@ -36,6 +36,7 @@
           </button>
           <div class="user-dropdown" id="userDropdown">
             <button type="button" data-view="profile">Profil</button>
+            <button type="button" data-view="library">Biblioteczka</button>
             <button type="button" data-admin-action="add-title">Dodaj nowy tytuł</button>
             <button type="button" data-admin-action="add-chapter">Dodaj nowy rozdział</button>
             <button type="button" id="logoutButton">Wyloguj</button>
@@ -196,6 +197,17 @@
 
       <section class="view" id="readerView" data-view-name="reader">
         <div id="readerDetail"></div>
+      </section>
+
+      <section class="view" id="libraryView" data-view-name="library">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">Twoja kolekcja</span>
+            <h1>Biblioteczka</h1>
+            <p>Tylko Ty masz dostęp do zapisanych tutaj tytułów.</p>
+          </div>
+        </div>
+        <div id="libraryDetail"></div>
       </section>
 
       <section class="view" id="profileView" data-view-name="profile">

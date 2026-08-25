@@ -192,6 +192,9 @@
     renderAll();
     await syncTitlesFromServer();
     await hydrateTeamUsers();
+    state.activeTeamTab = "current";
+    state.teamCarouselInitialized = false;
+    renderTeam();
     syncPublishedChapters();
     window.setInterval(syncPublishedChapters, 15000);
     route();
@@ -517,6 +520,7 @@
       title: "titleView",
       reader: "readerView",
       profile: "profileView",
+    library: "libraryView",
       "add-title": "addTitleView",
       "add-chapter": "addChapterView",
       data: "dataView",
@@ -1491,7 +1495,24 @@
     return ids.map((id) => state.users[id] || placeholderUser(id));
   }
 
+  function getTranslatorPeople() {
+    const ids = [...new Set(
+      state.team
+        .filter((member) => member.status === "current")
+        .filter((member) => {
+          const user = state.users[member.discordId];
+          return user?.roles?.includes("Tłumacz");
+        })
+        .map((member) => member.discordId)
+    )];
+    return ids.map((id) => state.users[id] || placeholderUser(id));
+  }
+
   function getPeopleForTitle(title) {
+    return getTranslatorPeople();
+  }
+
+  function getPeopleForChapterEditor(title) {
     const ids = new Set(getTeamPeople().map((user) => user.id));
     (title.translators || []).forEach((id) => ids.add(id));
     normalizeEditors(title.editors).forEach((editor) => { if (editor.userId) ids.add(editor.userId); });
@@ -1580,7 +1601,7 @@
           <fieldset class="chapter-translator-fieldset">
             <legend>Tłumacz</legend>
             <div class="pretty-check-grid chapter-translator-checks">
-              ${getPeopleForTitle(title).map((user) => `
+              ${getPeopleForChapterEditor(title).map((user) => `
                 <label class="pretty-check">
                   <input type="checkbox" name="translators" value="${escapeAttr(user.id)}" ${(chapter.translators || []).includes(user.id) ? "checked" : ""}>
                   <span class="pretty-check-box">${checkIcon()}</span>
@@ -1730,6 +1751,32 @@
     });
   }
 
+  function renderLibrary() {
+    const container = document.querySelector("#libraryDetail");
+    if (!container) return;
+    const user = currentUser();
+    if (!user) {
+      container.innerHTML = `<div class="profile-tile"><h2>Zaloguj się, aby zobaczyć swoją biblioteczkę.</h2></div>`;
+      return;
+    }
+    const titles = state.library.map(findTitle).filter(Boolean);
+    container.innerHTML = `
+      <section class="profile-tile">
+        <div class="library-grid">
+          ${titles.length ? titles.map((title) => `
+            <button class="library-item" type="button" data-library-title="${escapeAttr(title.id)}">
+              <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
+              <h3>${escapeHtml(title.title)}</h3>
+            </button>
+          `).join("") : `<p>Nie masz jeszcze tytułów w bibliotece.</p>`}
+        </div>
+      </section>
+    `;
+    container.querySelectorAll("[data-library-title]").forEach((button) => {
+      button.addEventListener("click", () => openTitle(button.dataset.libraryTitle));
+    });
+  }
+
   function renderProfile() {
     const container = document.querySelector("#profileDetail");
     const user = currentUser();
@@ -1766,20 +1813,8 @@
           <div class="profile-content">
             <section class="profile-tile profile-description">
               <h2>Opis</h2>
-              <textarea id="profileDescriptionInput">${escapeHtml(state.profileDescription)}</textarea>
+              <textarea id="profileDescriptionInput" placeholder="">${escapeHtml(state.profileDescription || "")}</textarea>
               <button class="primary-button" type="button" id="saveProfileDescription">Zapisz opis</button>
-            </section>
-
-            <section class="profile-tile">
-              <h2>Biblioteczka</h2>
-              <div class="library-grid">
-                ${libraryTitles.length ? libraryTitles.map((title) => `
-                  <button class="library-item" type="button" data-profile-title="${escapeAttr(title.id)}">
-                    <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
-                    <h3>${escapeHtml(title.title)}</h3>
-                  </button>
-                `).join("") : `<p>Nie masz jeszcze tytułów w bibliotece.</p>`}
-              </div>
             </section>
 
             ${translated.length ? `

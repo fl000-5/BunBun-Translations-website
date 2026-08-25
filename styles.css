@@ -629,3 +629,12 @@ body.modal-open::before {
 .latest-card-body .latest-chapter-row + .latest-chapter-row { border-top: 1px solid #f7ddeb; }
 .latest-chapter-row span:first-child { color: var(--pink-deep); }
 .latest-chapter-row span:last-child { white-space: nowrap; }
+
+.social-links a svg { width: 20px; height: 20px; display: block; }
+.profile-shell { overflow: hidden; }
+.profile-banner { min-height: 240px; }
+.profile-body { padding-top: 0; }
+.profile-header-row { position: relative; z-index: 2; min-height: 130px; }
+.profile-names { padding-top: 70px; padding-bottom: 16px; }
+.profile-names h1, .profile-names p { overflow-wrap: anywhere; }
+#libraryDetail { margin-top: 18px; }
