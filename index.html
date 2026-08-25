@@ -19,8 +19,11 @@
       </nav>
 
       <form class="title-search" id="searchForm" role="search">
-        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <span class="search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg>
+        </span>
         <input id="titleSearch" type="search" placeholder="Szukaj tytułów" autocomplete="off">
+        <div id="globalSearchResults" class="global-search-results is-hidden" role="listbox"></div>
       </form>
 
       <div class="session-slot">

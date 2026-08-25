@@ -73,6 +73,7 @@
     activeTeamTab: "current",
     teamCarouselIndex: 0,
     teamCarouselMoving: false,
+    teamCarouselInitialized: false,
     titleQuery: "",
     randomTitleId: null,
     uploadedPages: [],
@@ -222,6 +223,10 @@
       navigate("translations");
       renderTranslations();
     });
+    document.querySelector("#searchForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      renderGlobalSearch();
+    });
     searchInput.addEventListener("input", () => {
       state.titleQuery = searchInput.value.trim();
       renderGlobalSearch();
@@ -328,6 +333,7 @@
       button.addEventListener("click", () => {
         state.activeTeamTab = button.dataset.teamTab;
         state.teamCarouselIndex = 0;
+        state.teamCarouselInitialized = false;
         renderTeam();
       });
     });
@@ -715,43 +721,53 @@
 
   function renderLatest() {
     const grid = document.querySelector("#latestGrid");
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
     const latestTitles = state.translations
-      .map((title) => ({
-        title,
-        latestDate: title.chapters.length
-          ? Math.max(...title.chapters.map((chapter) => new Date(chapter.date).getTime() || 0))
-          : 0
-      }))
-      .filter((item) => item.latestDate > 0)
+      .map((title) => {
+        const latestChapter = title.chapters
+          .slice()
+          .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))[0];
+        return {
+          title,
+          latestChapter,
+          latestDate: latestChapter ? (new Date(latestChapter.date).getTime() || 0) : 0
+        };
+      })
+      .filter((item) => item.latestDate > 0 && (now - item.latestDate) <= sevenDays)
       .sort((a, b) => b.latestDate - a.latestDate)
-      .slice(0, 8);
+      .slice(0, 6);
 
     if (!latestTitles.length) {
-      grid.innerHTML = `<div class="latest-empty">Brak opublikowanych rozdziałów.</div>`;
+      grid.innerHTML = `<div class="latest-empty">Brak nowych rozdziałów z ostatnich 7 dni.</div>`;
       return;
     }
 
     grid.innerHTML = latestTitles.map(({ title }) => {
-      const chapterRows = title.chapters
+      const lastChapters = title.chapters
         .slice()
         .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
         .slice(0, 3)
         .map((chapter) => `
-          <button type="button" class="latest-chapter-link" data-open-reader-title="${escapeAttr(title.id)}" data-open-reader-chapter="${escapeAttr(chapter.id)}">
-            <span class="latest-chapter-number">${escapeHtml(chapterDisplayName(chapter))}</span>
-            <span class="latest-chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
+          <button type="button"
+            class="latest-chapter-row"
+            data-open-reader-title="${escapeAttr(title.id)}"
+            data-open-reader-chapter="${escapeAttr(chapter.id)}">
+            <span>${escapeHtml(chapterDisplayName(chapter))}</span>
+            <span>${escapeHtml(formatDate(chapter.date))}</span>
           </button>
         `).join("");
 
       return `
         <article class="latest-card">
-          <button class="latest-title-button" type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
+          <button type="button" class="latest-title-button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
             <img src="${escapeAttr(title.cover)}" alt="">
             <div class="latest-card-body">
               <h3>${escapeHtml(title.title)}</h3>
+              ${lastChapters || `<p>Brak opublikowanych rozdziałów</p>`}
             </div>
           </button>
-          <div class="latest-chapters">${chapterRows}</div>
         </article>
       `;
     }).join("");
@@ -760,7 +776,8 @@
       button.addEventListener("click", () => openTitle(button.dataset.openTitle));
     });
     grid.querySelectorAll("[data-open-reader-chapter]").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
         location.hash = `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
       });
     });
@@ -855,6 +872,13 @@
     if (!members.length) {
       track.innerHTML = `<div class="team-empty">Brak osób w tej kadrze.</div>`;
     } else {
+      if (!state.teamCarouselInitialized) {
+        const defaultId = "1206654146955182106";
+        const defaultIndex = members.findIndex((member) => member.discordId === defaultId);
+        state.teamCarouselIndex = defaultIndex >= 0 ? defaultIndex : 0;
+        state.teamCarouselInitialized = true;
+      }
+
       if (state.teamCarouselIndex < 0 || state.teamCarouselIndex >= members.length) {
         state.teamCarouselIndex = 0;
       }

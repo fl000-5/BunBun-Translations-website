@@ -604,3 +604,28 @@ body.modal-open::before {
 
 /* Profile roles */
 .profile-content .tag-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* Global search — dropdown is anchored directly under the search field. */
+.title-search { overflow: visible; z-index: 120; }
+.search-icon { width: 21px; height: 21px; display: grid; place-items: center; flex: 0 0 21px; color: var(--pink-deep); }
+.search-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.global-search-results { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 500; padding: 7px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.98); box-shadow: 0 18px 45px rgba(92,38,72,.18); backdrop-filter: blur(12px); }
+.global-search-results.is-hidden { display: none; }
+.global-search-result { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.global-search-result:hover { background: #fff0f8; }
+.global-search-result img { width: 42px; height: 56px; flex: 0 0 42px; object-fit: cover; aspect-ratio: 3/4; border-radius: 7px; }
+.global-search-result span { min-width: 0; display: grid; gap: 2px; }
+.global-search-result b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.global-search-result small { color: var(--muted); }
+.global-search-empty { padding: 14px 10px; color: var(--muted); text-align: center; font-weight: 800; }
+
+/* New chapters — same visual card style as the earlier version. */
+.latest-card { min-height: 196px; overflow: hidden; }
+.latest-card > .latest-title-button { width: 100%; min-height: 196px; display: grid; grid-template-columns: 132px minmax(0,1fr); border: 0; background: linear-gradient(90deg, white, #fffafd); padding: 0; text-align: left; color: inherit; cursor: pointer; }
+.latest-card > .latest-title-button img { width: 132px; height: 100%; min-height: 196px; object-fit: cover; object-position: center; }
+.latest-card-body { display: grid; align-content: center; padding: 18px; min-width: 0; }
+.latest-chapter-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; border: 0; background: transparent; color: var(--muted); text-align: left; font: inherit; font-size: .9rem; font-weight: 800; cursor: pointer; }
+.latest-chapter-row:hover { color: var(--pink-deep); }
+.latest-card-body .latest-chapter-row + .latest-chapter-row { border-top: 1px solid #f7ddeb; }
+.latest-chapter-row span:first-child { color: var(--pink-deep); }
+.latest-chapter-row span:last-child { white-space: nowrap; }
