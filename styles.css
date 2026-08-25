@@ -784,3 +784,45 @@ body.modal-open::before {
 .chapter-edit-modal .chapter-edit-form { overflow-y:auto; overflow-x:hidden; border-radius:0; }
 .chapter-edit-actions { flex:0 0 auto; margin-top:0; border-radius:0 0 16px 16px; }
 .custom-date-picker .custom-calendar { position:fixed !important; z-index:10000; }
+
+/* --- final corrections: latest chapters, Discord banners, descriptions, footer, search --- */
+body { min-height:100vh; display:flex; flex-direction:column; }
+body > main { flex:1 0 auto; width:100%; }
+.footer { margin-top:auto; flex:0 0 auto; width:100%; }
+.title-description { white-space:pre-line; }
+.profile-banner.has-color-banner { background:var(--discord-banner-color,#ffd0e9); }
+.profile-banner.has-color-banner span { display:block; width:100%; height:100%; }
+.library-grid .library-item h3,
+.profile-translated-section .translated-title-grid .library-item h3 { font-size:1.15rem; padding:12px; }
+.title-search input,
+.title-search input:focus,
+.title-search input:focus-visible,
+.title-search input:active {
+  outline:none !important;
+  border:0 !important;
+  box-shadow:none !important;
+  background:transparent !important;
+  -webkit-appearance:none;
+  appearance:none;
+}
+.title-search:focus-within { outline:none !important; box-shadow:none !important; }
+.title-search input:-webkit-autofill,
+.title-search input:-webkit-autofill:hover,
+.title-search input:-webkit-autofill:focus {
+  -webkit-text-fill-color:var(--ink);
+  -webkit-box-shadow:0 0 0 1000px transparent inset !important;
+  box-shadow:0 0 0 1000px transparent inset !important;
+  background-color:transparent !important;
+}
+.latest-chapter-link {
+  transition:background .16s ease, color .16s ease, transform .16s ease;
+}
+.latest-chapter-link:hover {
+  background:#ffe1f2 !important;
+  color:var(--pink-deep) !important;
+}
+.latest-chapter-link:focus,
+.latest-chapter-link:focus-visible {
+  outline:none !important;
+  box-shadow:none !important;
+}

@@ -88,9 +88,6 @@
     },
     users: clone(mockDiscordUsers),
     team: [
-      { id: "team-1", discordId: "100000000000000003", roles: ["Cleaner", "Typesetter"], status: "current" },
-      { id: "team-2", discordId: "100000000000000001", roles: ["Założyciel", "Tłumacz"], status: "current" },
-      { id: "team-3", discordId: "100000000000000002", roles: ["Współzałożyciel", "Tłumacz"], status: "current" },
       { id: "team-4", discordId: "100000000000000005", roles: ["Administracja"], status: "current" },
       { id: "team-5", discordId: "100000000000000004", roles: ["Dawna kadra"], status: "past" }
     ],
@@ -181,6 +178,14 @@
 
   const state = restoreState();
 
+  // Migration: remove the three accounts requested for deletion from older local caches.
+  const removedSeedIds = new Set([
+    "100000000000000001",
+    "100000000000000002",
+    "100000000000000003"
+  ]);
+  state.team = state.team.filter((member) => !removedSeedIds.has(String(member.discordId)));
+
   document.addEventListener("DOMContentLoaded", init);
 
   async function init() {
@@ -192,6 +197,7 @@
     await initDiscordSession();
     renderAll();
     await syncTitlesFromServer();
+    await hydrateTranslatorUsers();
     await hydrateTeamUsers();
     state.activeTeamTab = "current";
     state.teamCarouselInitialized = false;
@@ -850,6 +856,16 @@
     }
   }
 
+  async function hydrateTranslatorUsers() {
+    if (!hasBackend()) return;
+    const ids = [...new Set(
+      state.translations.flatMap((title) => Array.isArray(title.translators) ? title.translators : [])
+    )];
+    await Promise.all(ids.map(async (id) => {
+      try { await getDiscordUser(id, true); } catch {}
+    }));
+  }
+
   async function hydrateTeamUsers() {
     if (!hasBackend()) return;
     const members = [...state.team];
@@ -1056,7 +1072,7 @@
             <img class="title-cover" src="${escapeAttr(title.cover)}" alt="">
             <div class="title-copy">
               <h1>${escapeHtml(title.title)}</h1>
-              <p>${escapeHtml(title.description)}</p>
+              <p class="title-description">${escapeHtml(title.description)}</p>
               <div class="tag-row">
                 ${title.genres.map((genre) => `<span class="tag">${escapeHtml(genre)}</span>`).join("")}
                 <span class="tag">${escapeHtml(title.type)}</span>
@@ -1504,16 +1520,16 @@
   }
 
   function getTranslatorPeople() {
-    return Object.values(state.users).filter((user) => {
-      if (!Array.isArray(user.roles) || !user.roles.includes("Tłumacz")) return false;
-      const name = String(user.displayName || "").trim().toLocaleLowerCase("pl");
-      const username = String(user.username || "").trim().toLocaleLowerCase("pl");
-      // These three accounts are not available in the translator picker.
-      if (name === "flooo" || username === "fl000_5") return false;
-      if (name === "katsumi" || username === "katsumi") return false;
-      if (name === "eri" || username === "eri") return false;
-      return true;
-    });
+    const removedTranslatorIds = new Set([
+      "100000000000000001", // Flooo
+      "100000000000000002", // Katsumi
+      "100000000000000003"  // eri — konto z rolą Tłumacz
+    ]);
+    return Object.values(state.users).filter((user) =>
+      Array.isArray(user.roles) &&
+      user.roles.includes("Tłumacz") &&
+      !removedTranslatorIds.has(String(user.id))
+    );
   }
 
   function getPeopleForTitle(title) {
@@ -1986,8 +2002,11 @@
 
     container.innerHTML = `
       <article class="profile-shell">
-        <div class="profile-banner">
-          <img src="${escapeAttr(user.banner || user.bannerUrl || bannerSvg("#ffd0e9", "#f391ca", user.displayName || "B"))}" alt="">
+        <div class="profile-banner ${user.banner || user.bannerUrl ? "" : "has-color-banner"}"
+             ${!user.banner && !user.bannerUrl && user.bannerColor ? `style="--discord-banner-color:${escapeAttr(user.bannerColor)}"` : ""}>
+          ${user.banner || user.bannerUrl
+            ? `<img src="${escapeAttr(user.banner || user.bannerUrl)}" alt="">`
+            : `<span aria-hidden="true"></span>`}
         </div>
         <div class="profile-body">
           <div class="profile-header-row">
@@ -2352,7 +2371,11 @@
     if (hasBackend()) {
       try {
         const response = await fetch(apiUrl(`${DISCORD_USER}${encodeURIComponent(discordId)}`), { credentials: "include" });
-        if (response.ok) return ensureReaderRole(await response.json());
+        if (response.ok) {
+          const user = ensureReaderRole(await response.json());
+          if (user?.id) state.users[user.id] = user;
+          return user;
+        }
       } catch {
         return placeholderUser(discordId);
       }
