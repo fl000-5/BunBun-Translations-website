@@ -458,7 +458,9 @@
   }
 
   function bindForms() {
-    document.querySelector("#addTitleForm").addEventListener("submit", handleAddTitle);
+    const addTitleForm = document.querySelector("#addTitleForm");
+    addTitleForm.addEventListener("submit", handleAddTitle);
+    bindAddTitleForm(addTitleForm);
     document.querySelector("#addChapterForm").addEventListener("submit", handleAddChapter);
     document.querySelector("#chapterTitleSelect").addEventListener("change", updateChapterHints);
     document.querySelector("#chapterFiles").addEventListener("change", handleChapterFiles);
@@ -2143,30 +2145,181 @@
     });
   }
 
+  function bindAddTitleForm(form) {
+    if (!form) return;
+
+    const renderPeople = (role) => {
+      const people = getPeopleForChapterEditor();
+      const checks = people.map((user) => `
+        <label class="pretty-check editor-person-check">
+          <input type="checkbox" data-new-editor-check="${escapeAttr(role)}" value="${escapeAttr(user.id)}">
+          <span class="pretty-check-box"></span>
+          <span>${escapeHtml(user.displayName)}</span>
+        </label>
+      `).join("");
+      return `
+        <details class="editor-picker">
+          <summary>${escapeHtml(role)} <span data-new-editor-summary="${escapeAttr(role)}">Brak</span></summary>
+          <div class="editor-picker-list">
+            <label class="pretty-check">
+              <input type="checkbox" data-new-editor-none="${escapeAttr(role)}" checked>
+              <span class="pretty-check-box"></span>
+              <span>Brak</span>
+            </label>
+            ${checks}
+          </div>
+        </details>`;
+    };
+
+    form.querySelector("#newTitleTranslatorChecks").innerHTML = getTranslatorPeople().map((user) => `
+      <label class="pretty-check">
+        <input type="checkbox" name="translators" value="${escapeAttr(user.id)}">
+        <span class="pretty-check-box"></span>
+        <span>${escapeHtml(user.displayName)}</span>
+      </label>
+    `).join("") || `<span class="editor-help">Brak osób z rolą Tłumacz.</span>`;
+
+    form.querySelector("#newTitleEditorPickers").innerHTML =
+      ["Cleaner", "Korektor", "Typesetter"].map(renderPeople).join("");
+
+    form.querySelectorAll('input[name="cover"], input[name="banner"]').forEach((input) => {
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const data = await imageFileToDataUrl(
+            file,
+            input.name === "cover" ? 900 : 1600,
+            input.name === "cover" ? 1200 : 900
+          );
+          const preview = form.querySelector(input.name === "cover" ? "#newTitleCoverPreview" : "#newTitleBannerPreview");
+          const empty = preview?.parentElement.querySelector(".media-preview-empty");
+          if (preview) {
+            preview.src = data;
+            preview.classList.add("is-visible");
+          }
+          if (empty) empty.style.display = "none";
+          input.dataset.previewValue = data;
+        } catch (error) {
+          alert(error.message || "Nie udało się wczytać obrazu.");
+          input.value = "";
+        }
+      });
+    });
+
+    form.querySelectorAll("[data-add-new-person]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.addNewPerson;
+        const list = form.querySelector(`[data-new-people-list="${CSS.escape(type)}"]`);
+        list.insertAdjacentHTML("beforeend", `
+          <div class="person-editor-row" data-person-row>
+            <input data-person-name placeholder="Nazwa">
+            <input data-person-url placeholder="Link do profilu (opcjonalnie)" type="url">
+            <select data-person-status>
+              <option value="profile">Profil</option>
+              <option value="none">Brak profilu</option>
+              <option value="unknown">Nieznany</option>
+            </select>
+            <button class="icon-button is-small" type="button" data-remove-new-person aria-label="Usuń osobę">×</button>
+          </div>`);
+      });
+    });
+
+    form.addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-remove-new-person]");
+      if (remove) remove.closest("[data-person-row]")?.remove();
+    });
+
+    form.querySelectorAll("[data-new-editor-check]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const role = input.dataset.newEditorCheck;
+        if (input.checked) {
+          form.querySelectorAll(`[data-new-editor-check="${CSS.escape(role)}"]`).forEach((other) => {
+            if (other !== input) other.checked = false;
+          });
+          const none = form.querySelector(`[data-new-editor-none="${CSS.escape(role)}"]`);
+          if (none) none.checked = false;
+        }
+        updateNewTitleEditorSummary(form, role);
+      });
+    });
+
+    form.querySelectorAll("[data-new-editor-none]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const role = input.dataset.newEditorNone;
+        if (input.checked) {
+          form.querySelectorAll(`[data-new-editor-check="${CSS.escape(role)}"]`).forEach((other) => other.checked = false);
+        }
+        updateNewTitleEditorSummary(form, role);
+      });
+    });
+  }
+
+  function updateNewTitleEditorSummary(form, role) {
+    const checked = Array.from(form.querySelectorAll(`[data-new-editor-check="${CSS.escape(role)}"]:checked`));
+    const summary = form.querySelector(`[data-new-editor-summary="${CSS.escape(role)}"]`);
+    if (summary) summary.textContent = checked.length ? checked.map((input) => displayUserName(input.value)).join(", ") : "Brak";
+  }
+
   async function handleAddTitle(event) {
     event.preventDefault();
-    const cover = await fileToDataUrl(document.querySelector("#newTitleCover").files[0]);
-    const banner = await fileToDataUrl(document.querySelector("#newTitleBanner").files[0]);
-    const selectedTranslators = selectedValues(document.querySelector("#newTitleTranslators"));
-    const titleName = document.querySelector("#newTitleName").value.trim();
+
+    const form = event.currentTarget;
+    const coverInput = form.querySelector("#newTitleCover");
+    const bannerInput = form.querySelector("#newTitleBanner");
+    const cover = coverInput.files?.[0] ? await fileToDataUrl(coverInput.files[0]) : "";
+    const banner = bannerInput.files?.[0] ? await fileToDataUrl(bannerInput.files[0]) : "";
+    const selectedTranslators = Array.from(form.querySelectorAll('input[name="translators"]:checked')).map((input) => input.value);
+    const titleName = form.querySelector("#newTitleName").value.trim();
+
+    const collectPeople = (type) => Array.from(form.querySelectorAll(`[data-new-people-list="${type}"] [data-person-row]`))
+      .map((row) => ({
+        name: row.querySelector("[data-person-name]")?.value.trim() || "",
+        url: row.querySelector("[data-person-url]")?.value.trim() || "",
+        status: row.querySelector("[data-person-status]")?.value || "profile"
+      }))
+      .filter((person) => person.name || person.url || person.status !== "profile");
+
+    const collectEditors = () => ["Cleaner", "Korektor", "Typesetter"].map((role) => {
+      const checked = form.querySelector(`[data-new-editor-check="${CSS.escape(role)}"]:checked`);
+      return checked ? { role, userId: checked.value, name: displayUserName(checked.value) } : null;
+    }).filter(Boolean);
+
+    const authors = form.querySelector("#authorUnknown").checked
+      ? [{ name: "Nieznany", url: "", status: "unknown" }]
+      : collectPeople("authors");
+    const artists = form.querySelector("#artistUnknown").checked
+      ? [{ name: "Nieznany", url: "", status: "unknown" }]
+      : collectPeople("artists");
+
+    if (!authors.length) {
+      alert("Dodaj autora albo zaznacz „Nieznany”.");
+      return;
+    }
+    if (!artists.length) {
+      alert("Dodaj artystę albo zaznacz „Nieznany”.");
+      return;
+    }
+    if (!selectedTranslators.length) {
+      alert("Wybierz co najmniej jednego tłumacza.");
+      return;
+    }
+
     const newTitle = {
       id: slugify(titleName),
       title: titleName,
-      type: document.querySelector("#newTitleType").value,
-      status: document.querySelector("#newTitleStatus").value,
-      genres: splitList(document.querySelector("#newTitleGenres").value),
-      adult: Boolean(document.querySelector("#newTitleAdult")?.checked),
-      channelId: document.querySelector("#newTitleChannelId")?.value.trim() || "",
+      type: form.querySelector("#newTitleType").value,
+      status: form.querySelector("#newTitleStatus").value,
+      genres: splitList(form.querySelector("#newTitleGenres").value),
+      adult: Boolean(form.querySelector("#newTitleAdult").checked),
+      channelId: form.querySelector("#newTitleChannelId").value.trim(),
       cover,
       banner,
-      description: document.querySelector("#newTitleDescription").value.trim(),
-      authors: document.querySelector("#authorUnknown").checked ? ["Nieznany"] : splitList(document.querySelector("#newTitleAuthors").value),
-      artists: document.querySelector("#artistUnknown").checked ? ["Nieznany"] : splitList(document.querySelector("#newTitleArtists").value),
+      description: form.querySelector("#newTitleDescription").value,
+      authors,
+      artists,
       translators: selectedTranslators,
-      editors: splitList(document.querySelector("#newTitleEditors").value).map((entry) => {
-        const [role, name] = entry.includes(":") ? entry.split(":") : ["Edycja", entry];
-        return { role: role.trim(), name: name.trim() };
-      }),
+      editors: collectEditors(),
       chapters: []
     };
 
@@ -2176,7 +2329,12 @@
 
     state.translations.push(newTitle);
     await saveTitleToServer(newTitle);
-    event.target.reset();
+    form.reset();
+    form.querySelectorAll(".media-preview img").forEach((img) => {
+      img.removeAttribute("src");
+      img.classList.remove("is-visible");
+    });
+    form.querySelectorAll(".media-preview-empty").forEach((node) => node.style.display = "");
     persistState();
     renderAll();
     openTitle(newTitle.id);

@@ -209,61 +209,75 @@
       </section>
 
       <section class="view" id="addTitleView" data-view-name="add-title">
-        <div class="panel-heading">
-          <h1>Dodaj nowy tytuł</h1>
-          <p>Osobny formularz do zakładania serii.</p>
+        <div class="title-page-heading">
+          <div>
+            <h1>Dodaj nowy tytuł</h1>
+            <p>Uzupełnij wszystkie informacje o tytule przed jego dodaniem.</p>
+          </div>
         </div>
-        <form id="addTitleForm" class="form-shell">
-          <label>
-            Nazwa
-            <input id="newTitleName" required>
-          </label>
-          <label>
-            Okładka
-            <input id="newTitleCover" type="file" accept="image/*" required>
-          </label>
-          <label>
-            Baner
-            <input id="newTitleBanner" type="file" accept="image/*" required>
-          </label>
-          <label>
-            Opis
-            <textarea id="newTitleDescription" rows="5" required></textarea>
+
+        <form id="addTitleForm" class="series-editor-form add-title-form">
+          <div class="two-columns">
+            <label>
+              Tytuł
+              <input id="newTitleName" name="title" required placeholder="Nazwa tytułu">
+            </label>
+            <label>
+              ID kanału Discord
+              <input id="newTitleChannelId" name="channelId" placeholder="np. 123456789012345678">
+            </label>
+          </div>
+
+          <label class="checkbox-row editor-adult-check">
+            <input id="newTitleAdult" name="adult" type="checkbox">
+            Pokaż jako tytuł 18+
           </label>
 
-          <div class="two-columns">
-            <fieldset>
-              <legend>Autor/Autorzy</legend>
-              <input id="newTitleAuthors" required placeholder="Nazwy lub linki do X">
-              <label class="checkbox-row"><input id="authorUnknown" type="checkbox"> Nieznany</label>
-              <label class="checkbox-row"><input id="authorNoProfile" type="checkbox"> Brak profilu</label>
-            </fieldset>
-            <fieldset>
-              <legend>Artysta/Artyści</legend>
-              <input id="newTitleArtists" required placeholder="Nazwy lub linki do X">
-              <label class="checkbox-row"><input id="artistUnknown" type="checkbox"> Nieznany</label>
-              <label class="checkbox-row"><input id="artistNoProfile" type="checkbox"> Brak profilu</label>
-            </fieldset>
+          <div class="media-edit-grid">
+            <div class="media-editor-card">
+              <div class="media-editor-label"><b>Okładka</b><span>3:4</span></div>
+              <div class="media-preview cover-preview">
+                <img id="newTitleCoverPreview" src="" alt="Podgląd okładki">
+                <span class="media-preview-empty">Brak wybranego zdjęcia</span>
+              </div>
+              <label class="file-picker">
+                <span>Wybierz zdjęcie</span>
+                <input id="newTitleCover" name="cover" type="file" accept="image/*" required>
+              </label>
+            </div>
+
+            <div class="media-editor-card">
+              <div class="media-editor-label"><b>Baner</b><span>16:9</span></div>
+              <div class="media-preview banner-preview">
+                <img id="newTitleBannerPreview" src="" alt="Podgląd baneru">
+                <span class="media-preview-empty">Brak wybranego zdjęcia</span>
+              </div>
+              <label class="file-picker">
+                <span>Wybierz zdjęcie</span>
+                <input id="newTitleBanner" name="banner" type="file" accept="image/*" required>
+              </label>
+            </div>
           </div>
 
           <label>
-            Tłumacz
-            <select id="newTitleTranslators" multiple required></select>
+            Opis
+            <textarea id="newTitleDescription" name="description" rows="7" required placeholder="Opis tytułu..."></textarea>
           </label>
-          <label>
-            Edycja
-            <input id="newTitleEditors" placeholder="ID lub nazwy osób, np. Cleaner: eri">
-          </label>
+
           <div class="two-columns">
             <label>
               Typ
-              <select id="newTitleType" required>
+              <select id="newTitleType" name="type" required>
                 <option>Manhwa</option>
+                <option>Manhua</option>
+                <option>Manga</option>
+                <option>Webtoon</option>
+                <option>Inne</option>
               </select>
             </label>
             <label>
-              Status tłumaczenia
-              <select id="newTitleStatus" required>
+              Status
+              <select id="newTitleStatus" name="status" required>
                 <option>Aktywna</option>
                 <option>Zawieszona</option>
                 <option>Planowana</option>
@@ -272,11 +286,75 @@
               </select>
             </label>
           </div>
+
           <label>
             Gatunki
-            <input id="newTitleGenres" required placeholder="Romans, Dramat, Fantasy">
+            <input id="newTitleGenres" name="genres" placeholder="Romans, Dramat, Fantasy">
           </label>
-          <button class="primary-button" type="submit">Dodaj tytuł</button>
+
+          <div class="people-editor-section">
+            <div class="editor-section-heading">
+              <h3>Autorzy</h3>
+              <button type="button" class="ghost-button" data-add-new-person="authors">+ Dodaj autora</button>
+            </div>
+            <div class="people-editor-list" data-new-people-list="authors">
+              <div class="person-editor-row" data-person-row>
+                <input data-person-name placeholder="Nazwa">
+                <input data-person-url placeholder="Link do profilu (opcjonalnie)" type="url">
+                <select data-person-status><option value="profile">Profil</option><option value="none">Brak profilu</option><option value="unknown">Nieznany</option></select>
+                <button class="icon-button is-small" type="button" data-remove-new-person aria-label="Usuń osobę">×</button>
+              </div>
+            </div>
+            <div class="pretty-check-grid">
+              <label class="pretty-check">
+                <input id="authorUnknown" type="checkbox">
+                <span class="pretty-check-box"></span>
+                <span>Nieznany</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="people-editor-section">
+            <div class="editor-section-heading">
+              <h3>Artyści</h3>
+              <button type="button" class="ghost-button" data-add-new-person="artists">+ Dodaj artystę</button>
+            </div>
+            <div class="people-editor-list" data-new-people-list="artists">
+              <div class="person-editor-row" data-person-row>
+                <input data-person-name placeholder="Nazwa">
+                <input data-person-url placeholder="Link do profilu (opcjonalnie)" type="url">
+                <select data-person-status><option value="profile">Profil</option><option value="none">Brak profilu</option><option value="unknown">Nieznany</option></select>
+                <button class="icon-button is-small" type="button" data-remove-new-person aria-label="Usuń osobę">×</button>
+              </div>
+            </div>
+            <div class="pretty-check-grid">
+              <label class="pretty-check">
+                <input id="artistUnknown" type="checkbox">
+                <span class="pretty-check-box"></span>
+                <span>Nieznany</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="people-editor-section">
+            <div class="editor-section-heading">
+              <h3>Tłumacze</h3>
+              <span class="editor-help">Wybierz osoby posiadające rolę Tłumacz.</span>
+            </div>
+            <div class="pretty-check-grid" id="newTitleTranslatorChecks"></div>
+          </div>
+
+          <div class="people-editor-section">
+            <div class="editor-section-heading">
+              <h3>Edycja</h3>
+              <span class="editor-help">Dla każdej funkcji wybierz osobę albo „Brak”.</span>
+            </div>
+            <div class="editor-pickers-grid" id="newTitleEditorPickers"></div>
+          </div>
+
+          <div class="inline-editor-actions">
+            <button class="primary-button" type="submit">Dodaj tytuł</button>
+          </div>
         </form>
       </section>
 
