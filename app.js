@@ -2021,7 +2021,7 @@
     container.innerHTML = `
       <article class="profile-shell">
         <div class="profile-banner ${user.banner || user.bannerUrl ? "" : "has-color-banner"}"
-             ${!user.banner && !user.bannerUrl && user.bannerColor ? `style="--discord-banner-color:${escapeAttr(user.bannerColor)}"` : ""}>
+             ${!user.banner && !user.bannerUrl ? `style="--discord-banner-color:${escapeAttr(user.bannerColor || "#ffd0e9")}"` : ""}>
           ${user.banner || user.bannerUrl
             ? `<img src="${escapeAttr(user.banner || user.bannerUrl)}" alt="">`
             : `<span aria-hidden="true"></span>`}
