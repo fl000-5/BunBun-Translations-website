@@ -1776,8 +1776,10 @@
     });
 
     document.addEventListener("click", (event) => {
-      if (!picker.contains(event.target)) calendar.classList.add("is-hidden");
-    }, { once: false });
+      if (calendar.classList.contains("is-hidden")) return;
+      if (picker.contains(event.target) || calendar.contains(event.target)) return;
+      calendar.classList.add("is-hidden");
+    });
   }
 
   function openChapterEditor(titleId, chapterId) {
@@ -1838,6 +1840,9 @@
       </div>`;
     document.body.appendChild(modal);
     document.body.classList.add("modal-open");
+
+    // Initialize the custom date picker for this chapter editor.
+    bindCustomDatePicker(modal.querySelector("[data-date-picker]"));
 
     const close = () => {
       modal.remove();

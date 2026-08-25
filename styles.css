@@ -1498,3 +1498,8 @@ body > main { flex:1 0 auto; width:100%; }
 .custom-calendar-foot button:hover {
   background: #ffddec !important;
 }
+
+/* No decorative circle in the page background */
+body {
+  background: linear-gradient(180deg, #fffafd 0%, var(--bg) 46%, #fff1fa 100%) !important;
+}
