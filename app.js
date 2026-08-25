@@ -1702,16 +1702,36 @@
       calendar.style.width = `${calendarWidth}px`;
     };
 
+    const closeCalendar = () => {
+      if (calendar.classList.contains("is-hidden")) return;
+      calendar.classList.add("is-hidden");
+      if (calendar.parentElement === document.body) {
+        picker.appendChild(calendar);
+      }
+    };
+
     const openCalendar = (event) => {
       event.stopPropagation();
-      calendar.classList.toggle("is-hidden");
       if (!calendar.classList.contains("is-hidden")) {
-        renderCalendar();
-        positionCalendar();
+        closeCalendar();
+        return;
       }
+
+      // Move the calendar outside the scrollable modal/form.
+      // This prevents the editor's scrollbar/overflow from clipping it.
+      document.body.appendChild(calendar);
+      calendar.classList.remove("is-hidden");
+      renderCalendar();
+      requestAnimationFrame(positionCalendar);
     };
     toggle.addEventListener("click", openCalendar);
     display.addEventListener("click", openCalendar);
+    window.addEventListener("resize", () => {
+      if (!calendar.classList.contains("is-hidden")) positionCalendar();
+    });
+    window.addEventListener("scroll", () => {
+      if (!calendar.classList.contains("is-hidden")) positionCalendar();
+    }, true);
 
     calendar.addEventListener("click", (event) => {
       const button = event.target.closest("[data-calendar-day]");
@@ -1722,16 +1742,18 @@
           cursor = new Date(date.getFullYear(), date.getMonth(), 1);
         }
         setDate(iso);
-        calendar.classList.add("is-hidden");
+        closeCalendar();
         return;
       }
       if (event.target.closest("[data-calendar-prev]")) {
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
         renderCalendar();
+        positionCalendar();
       }
       if (event.target.closest("[data-calendar-next]")) {
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
         renderCalendar();
+        positionCalendar();
       }
       if (event.target.closest("[data-calendar-clear]")) setDate("");
       if (event.target.closest("[data-calendar-today]")) {
