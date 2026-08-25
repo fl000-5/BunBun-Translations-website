@@ -47,8 +47,8 @@ img { display: block; max-width: 100%; }
   align-items: center;
   gap: 18px;
   padding: 10px clamp(16px, 4vw, 56px);
-  background: rgba(255, 247, 252, 0.94);
-  border-bottom: 1px solid rgba(244, 196, 223, 0.95);
+  background: rgba(247, 235, 243, 0.97);
+  border-bottom: 1px solid rgba(228, 177, 207, 0.98);
   backdrop-filter: blur(16px);
 }
 .brand { display: inline-flex; align-items: center; min-width: 132px; }
@@ -163,8 +163,7 @@ h1, h2, h3, p { margin-top: 0; }
 .team-admin-action.is-danger { color: #b83665; }
 
 .list-toolbar, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-.filters-panel { display: none; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 16px; margin-bottom: 20px; background: white; }
-.filters-panel.is-open { display: grid; }
+.filters-panel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 16px; margin-bottom: 28px; background: white; }
 label, fieldset { display: grid; gap: 7px; color: var(--ink); font-weight: 850; }
 fieldset { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); }
 legend { padding: 0 8px; font-weight: 900; }
@@ -172,8 +171,13 @@ input, select, textarea { width: 100%; min-height: 42px; padding: 9px 11px; bord
 textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(245, 158, 210, 0.24); }
 select[multiple] { min-height: 116px; }
-.checkbox-row { display: flex; align-items: center; gap: 8px; min-height: 42px; }
-.checkbox-row input { width: auto; min-height: auto; }
+.checkbox-row { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fffafd; color: var(--ink); cursor: pointer; }
+.checkbox-row input { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; min-height: 20px; margin: 0; flex: 0 0 20px; border: 2px solid var(--pink); border-radius: 6px; background: white; display: grid; place-content: center; cursor: pointer; transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease; }
+.checkbox-row input::before { content: ""; width: 10px; height: 6px; border-left: 2px solid white; border-bottom: 2px solid white; transform: rotate(-45deg) scale(0); transform-origin: center; transition: transform 0.12s ease; }
+.checkbox-row input:checked { background: var(--pink-hot); border-color: var(--pink-hot); box-shadow: 0 4px 10px rgba(237, 116, 189, 0.22); }
+.checkbox-row input:checked::before { transform: rotate(-45deg) scale(1); }
+.checkbox-row input:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(245, 158, 210, 0.28); }
+.checkbox-row:has(input:checked) { border-color: var(--pink); background: #fff0f8; }
 .translation-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
 .translation-card { display: grid; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: 0 12px 28px rgba(184, 72, 136, 0.08); transition: transform 0.18s ease, box-shadow 0.18s ease; }
 .translation-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
@@ -270,7 +274,7 @@ select[multiple] { min-height: 116px; }
   .hero-panel, .title-main, .profile-header-row { grid-template-columns: 1fr; }
   .hero-panel { min-height: auto; }
   .welcome-bunny { width: min(380px, 100%); }
-  .counter-band, .filters-panel.is-open, .latest-grid, .two-columns, .role-grid { grid-template-columns: 1fr 1fr; }
+  .counter-band, .filters-panel, .latest-grid, .two-columns, .role-grid { grid-template-columns: 1fr 1fr; }
   .team-track .team-card { flex-basis: calc((100% - 24px) / 2); }
   .title-cover { margin-top: -50px; }
   .profile-avatar { width: 132px; height: 132px; }
@@ -282,7 +286,7 @@ select[multiple] { min-height: 116px; }
   .topbar { grid-template-columns: 1fr auto auto; }
   .main-nav { display: grid; grid-template-columns: 1fr 1fr; }
   .main-nav a { justify-content: center; padding-inline: 8px; }
-  .counter-band, .filters-panel.is-open, .latest-grid, .translation-grid, .two-columns, .editor-grid, .role-grid, .profile-content { grid-template-columns: 1fr; }
+  .counter-band, .filters-panel, .latest-grid, .translation-grid, .two-columns, .editor-grid, .role-grid, .profile-content { grid-template-columns: 1fr; }
   .latest-card button { grid-template-columns: 112px minmax(0, 1fr); }
   .latest-card img { width: 112px; min-height: 170px; }
   .team-carousel { grid-template-columns: 34px minmax(0, 1fr) 34px; }

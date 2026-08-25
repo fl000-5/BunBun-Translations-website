@@ -262,10 +262,6 @@
   }
 
   function bindFilters() {
-    document.querySelector("#filterToggle").addEventListener("click", () => {
-      document.querySelector("#filtersPanel").classList.toggle("is-open");
-    });
-
     ["typeFilter", "statusFilter", "genreFilter", "adultFilter"].forEach((id) => {
       document.querySelector(`#${id}`).addEventListener("change", renderTranslations);
     });
