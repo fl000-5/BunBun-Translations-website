@@ -36,6 +36,7 @@
             <button type="button" data-admin-action="add-title">Dodaj nowy tytuł</button>
             <button type="button" data-admin-action="add-chapter">Dodaj nowy rozdział</button>
             <button type="button" data-admin-action="data">Dane</button>
+            <button type="button" data-admin-action="edit-series">Edycja serii</button>
             <button type="button" id="logoutButton">Wyloguj</button>
           </div>
         </div>
@@ -353,7 +354,58 @@
         </section>
       </section>
 
-
+      <section class="view" id="editSeriesView" data-view-name="edit-series">
+        <div class="panel-heading">
+          <h1>Edycja serii</h1>
+          <p>Edytuj lub usuń już istniejący tytuł.</p>
+        </div>
+        <form id="editSeriesForm" class="form-shell">
+          <label>
+            Wybierz serię
+            <select id="editSeriesSelect"></select>
+          </label>
+          <label>
+            Nazwa
+            <input id="editSeriesName" required>
+          </label>
+          <label>
+            Okładka URL
+            <input id="editSeriesCover" required>
+          </label>
+          <label>
+            Baner URL
+            <input id="editSeriesBanner" required>
+          </label>
+          <label>
+            Opis
+            <textarea id="editSeriesDescription" rows="5" required></textarea>
+          </label>
+          <div class="two-columns">
+            <label>
+              Typ
+              <input id="editSeriesType" required>
+            </label>
+            <label>
+              Status
+              <select id="editSeriesStatus" required>
+                <option>Aktywna</option>
+                <option>Zawieszona</option>
+                <option>Planowana</option>
+                <option>Zakończona</option>
+                <option>Porzucona</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Gatunki
+            <input id="editSeriesGenres" required>
+          </label>
+          <div class="button-row">
+            <button class="primary-button" type="submit">Zapisz zmiany</button>
+            <button class="danger-button" type="button" id="deleteSeriesButton">Usuń tytuł</button>
+          </div>
+        </form>
+      </section>
     </main>
 
     <footer class="footer">

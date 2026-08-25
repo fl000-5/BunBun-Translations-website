@@ -101,7 +101,7 @@
         status: "Aktywna",
         genres: ["Romans", "Dramat", "BL"],
         cover: SAMPLE_COVER,
-        banner: bannerSvg("#ffd0e9", "#f391ca", "Unsleep"),
+        banner: SAMPLE_COVER,
         description: "Pionowa okładka testowa pokazuje, jak strona mieści dodawane grafiki w liście, losowym tytule i przy rozdziałach.",
         authors: ["Unknown"],
         artists: ["Unknown"],
@@ -389,6 +389,9 @@
     document.querySelector("#addTitleForm").addEventListener("submit", handleAddTitle);
     document.querySelector("#addChapterForm").addEventListener("submit", handleAddChapter);
     document.querySelector("#dataForm").addEventListener("submit", handleSaveData);
+    document.querySelector("#editSeriesForm").addEventListener("submit", handleEditSeries);
+    document.querySelector("#deleteSeriesButton").addEventListener("click", handleDeleteSeries);
+    document.querySelector("#editSeriesSelect").addEventListener("change", populateEditSeriesForm);
     document.querySelector("#chapterTitleSelect").addEventListener("change", updateChapterHints);
     document.querySelector("#chapterFiles").addEventListener("change", handleChapterFiles);
   }
@@ -422,6 +425,7 @@
     renderTranslations();
     populatePeopleSelects();
     populateChapterTitleSelect();
+    populateEditSeriesSelect();
     renderProfile();
     renderData();
   }
@@ -460,6 +464,7 @@
       "add-title": "addTitleView",
       "add-chapter": "addChapterView",
       data: "dataView",
+      "edit-series": "editSeriesView"
     };
 
     const fallback = ids[view] ? view : "home";
@@ -475,6 +480,10 @@
     if (fallback === "add-chapter") {
       populateChapterTitleSelect();
       updateChapterHints();
+    }
+    if (fallback === "edit-series") {
+      populateEditSeriesSelect();
+      populateEditSeriesForm();
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -500,6 +509,7 @@
     setAdminButtonVisibility("add-title", canTitle);
     setAdminButtonVisibility("add-chapter", canChapter);
     setAdminButtonVisibility("data", canData);
+    setAdminButtonVisibility("edit-series", canTitle);
     document.querySelector("#teamManager").classList.toggle("is-hidden", !canData);
   }
 
@@ -648,7 +658,7 @@
       <div class="random-title-heading">
         <span>Losowy tytuł</span>
       </div>
-      <img class="random-title-banner" src="${escapeAttr(title.banner)}" alt="">
+      <img src="${escapeAttr(title.cover)}" alt="">
       <div class="random-title-body">
         <h3>${escapeHtml(title.title)}</h3>
         <p>${escapeHtml(title.description)}</p>
@@ -857,16 +867,13 @@
       return;
     }
 
-    normalizeTitlePeople(title);
     const inLibrary = state.library.includes(title.id);
     const staff = [
-      ["Autor", renderPeopleInline(title.authors)],
-      ["Artysta", renderPeopleInline(title.artists)],
-      ["Tłumacz", title.translators.map(displayUserName).join(", ") || "Brak"],
-      ["Edycja", renderEditorsInline(title.editors)]
+      ["Autor", title.authors.join(", ")],
+      ["Artysta", title.artists.join(", ")],
+      ["Tłumacz", title.translators.map(displayUserName).join(", ")],
+      ["Edycja", title.editors.map((editor) => `${editor.role}: ${editor.name}`).join(", ") || "Brak"]
     ];
-    const canEdit = canManageTitles();
-    const canDelete = canDeleteSeries();
 
     container.innerHTML = `
       <article class="title-detail">
@@ -886,18 +893,11 @@
                 <button class="primary-button" type="button" data-library="${escapeAttr(title.id)}">
                   ${inLibrary ? "W bibliotece" : "Dodaj do biblioteki"}
                 </button>
-                ${canEdit ? `<button class="ghost-button icon-text-button" type="button" data-edit-title="${escapeAttr(title.id)}" aria-expanded="false">
-                  ${pencilIcon()}<span>Edytuj serię</span>
-                </button>` : ""}
-                ${canDelete ? `<button class="danger-button icon-text-button" type="button" data-delete-title="${escapeAttr(title.id)}">
-                  ${trashIcon()}<span>Usuń serię</span>
-                </button>` : ""}
+                ${canManageTitles() ? `<button class="ghost-button" type="button" data-edit-title="${escapeAttr(title.id)}">Edytuj serię</button>` : ""}
               </div>
             </div>
           </div>
         </section>
-
-        ${canEdit ? renderInlineSeriesEditor(title) : ""}
 
         <div class="title-info-grid">
           <section class="title-info-block">
@@ -906,7 +906,7 @@
               ${staff.map(([label, value]) => `
                 <div class="staff-row">
                   <b>${escapeHtml(label)}</b>
-                  <span>${value}</span>
+                  <span>${escapeHtml(value)}</span>
                 </div>
               `).join("")}
             </div>
@@ -922,8 +922,7 @@
       </article>
     `;
 
-    const libraryButton = container.querySelector("[data-library]");
-    if (libraryButton) libraryButton.addEventListener("click", () => toggleLibrary(title.id));
+    container.querySelector("[data-library]").addEventListener("click", () => toggleLibrary(title.id));
     container.querySelectorAll("[data-open-reader]").forEach((button) => {
       button.addEventListener("click", () => {
         location.hash = `#reader/${encodeURIComponent(title.id)}/${encodeURIComponent(button.dataset.openReader)}`;
@@ -936,325 +935,16 @@
         renderTitle(title.id);
       });
     });
-
     const editButton = container.querySelector("[data-edit-title]");
-    if (editButton) editButton.addEventListener("click", () => toggleInlineSeriesEditor(title.id));
-    const deleteButton = container.querySelector("[data-delete-title]");
-    if (deleteButton) deleteButton.addEventListener("click", () => handleDeleteTitleFromDetail(title.id));
-
-    const editor = container.querySelector("#inlineSeriesEditor");
-    if (editor) bindInlineSeriesEditor(editor, title);
-  }
-
-  function renderInlineSeriesEditor(title) {
-    const translatorUsers = getPeopleForTitle(title);
-    const authors = normalizePeople(title.authors);
-    const artists = normalizePeople(title.artists);
-    const editors = normalizeEditors(title.editors);
-    const translatorChecks = translatorUsers.map((user) => `
-      <label class="pretty-check">
-        <input type="checkbox" data-translator-check value="${escapeAttr(user.id)}" ${title.translators.includes(user.id) ? "checked" : ""}>
-        <span class="pretty-check-box"></span>
-        <span>${escapeHtml(user.displayName)}</span>
-      </label>
-    `).join("");
-
-    const editorRoleBlocks = ["Cleaner", "Korektor", "Typesetter"].map((role) => {
-      const selected = editors.filter((item) => item.role === role).map((item) => item.userId).filter(Boolean);
-      const people = translatorUsers.map((user) => `
-        <label class="pretty-check editor-person-check">
-          <input type="checkbox" data-editor-check="${escapeAttr(role)}" value="${escapeAttr(user.id)}" ${selected.includes(user.id) ? "checked" : ""}>
-          <span class="pretty-check-box"></span>
-          <span>${escapeHtml(user.displayName)}</span>
-        </label>
-      `).join("");
-      return `
-        <details class="editor-picker">
-          <summary>${escapeHtml(role)} <span data-editor-summary="${escapeAttr(role)}">${selected.length ? selected.map(displayUserName).join(", ") : "Brak"}</span></summary>
-          <div class="editor-picker-list">
-            <label class="pretty-check">
-              <input type="checkbox" data-editor-none="${escapeAttr(role)}" ${selected.length ? "" : "checked"}>
-              <span class="pretty-check-box"></span>
-              <span>Brak</span>
-            </label>
-            ${people}
-          </div>
-        </details>
-      `;
-    }).join("");
-
-    return `
-      <section class="inline-editor is-hidden" id="inlineSeriesEditor" aria-label="Edycja serii">
-        <div class="inline-editor-head">
-          <div>
-            <h2>Edytuj serię</h2>
-            <p>Zmiany zapisują się w danych strony po kliknięciu przycisku na dole.</p>
-          </div>
-          <button class="icon-button" type="button" data-close-editor aria-label="Zamknij edycję">×</button>
-        </div>
-        <form class="series-editor-form" data-inline-series-form>
-          <label>
-            Tytuł
-            <input name="title" value="${escapeAttr(title.title)}" required>
-          </label>
-          <div class="media-edit-grid">
-            <div class="media-editor-card">
-              <div class="media-editor-label"><b>Okładka</b><span>3:4</span></div>
-              <div class="media-preview cover-preview"><img data-cover-preview src="${escapeAttr(title.cover)}" alt="Podgląd okładki"></div>
-              <label class="file-picker">
-                <span>Wybierz zdjęcie</span>
-                <input name="cover" type="file" accept="image/*">
-              </label>
-            </div>
-            <div class="media-editor-card">
-              <div class="media-editor-label"><b>Baner</b><span>16:9</span></div>
-              <div class="media-preview banner-preview"><img data-banner-preview src="${escapeAttr(title.banner)}" alt="Podgląd baneru"></div>
-              <label class="file-picker">
-                <span>Wybierz zdjęcie</span>
-                <input name="banner" type="file" accept="image/*">
-              </label>
-            </div>
-          </div>
-          <label>
-            Opis
-            <textarea name="description" rows="6" required>${escapeHtml(title.description)}</textarea>
-          </label>
-          <div class="two-columns">
-            <label>Typ<input name="type" value="${escapeAttr(title.type)}" required></label>
-            <label>Status
-              <select name="status" required>
-                ${["Aktywna", "Zawieszona", "Planowana", "Zakończona", "Porzucona"].map((value) => `<option ${title.status === value ? "selected" : ""}>${escapeHtml(value)}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-          <label>Gatunki<input name="genres" value="${escapeAttr(title.genres.join(", "))}" placeholder="Romans, Dramat, BL"></label>
-
-          <div class="people-editor-section">
-            <div class="editor-section-heading"><h3>Autorzy</h3><button type="button" class="ghost-button" data-add-person="authors">+ Dodaj autora</button></div>
-            <div class="people-editor-list" data-people-list="authors">${renderPersonRows(authors, "author")}</div>
-          </div>
-          <div class="people-editor-section">
-            <div class="editor-section-heading"><h3>Artyści</h3><button type="button" class="ghost-button" data-add-person="artists">+ Dodaj artystę</button></div>
-            <div class="people-editor-list" data-people-list="artists">${renderPersonRows(artists, "artist")}</div>
-          </div>
-
-          <div class="people-editor-section">
-            <div class="editor-section-heading"><h3>Tłumacze</h3><span class="editor-help">Wybierz osoby z kadry.</span></div>
-            <div class="pretty-check-grid">${translatorChecks || `<span class="editor-help">Brak osób w obecnej kadrze.</span>`}</div>
-          </div>
-
-          <div class="people-editor-section">
-            <div class="editor-section-heading"><h3>Edycja</h3><span class="editor-help">Dla każdej funkcji wybierz osobę albo „Brak”.</span></div>
-            <div class="editor-pickers-grid">${editorRoleBlocks}</div>
-          </div>
-
-          <div class="inline-editor-actions">
-            <button class="primary-button" type="submit">Zapisz edycję</button>
-          </div>
-        </form>
-      </section>
-    `;
-  }
-
-  function renderPersonRows(items, type) {
-    const safeItems = items.length ? items : [{ name: "", url: "", status: "profile" }];
-    return safeItems.map((person, index) => `
-      <div class="person-editor-row" data-person-row>
-        <input data-person-name value="${escapeAttr(person.name || "")}" placeholder="Nazwa">
-        <input data-person-url value="${escapeAttr(person.url || "")}" placeholder="Link do profilu (opcjonalnie)" type="url">
-        <select data-person-status>
-          <option value="profile" ${person.status !== "unknown" && person.status !== "none" ? "selected" : ""}>Profil</option>
-          <option value="none" ${person.status === "none" ? "selected" : ""}>Brak profilu</option>
-          <option value="unknown" ${person.status === "unknown" ? "selected" : ""}>Nieznany</option>
-        </select>
-        <button class="icon-button is-small" type="button" data-remove-person aria-label="Usuń osobę">×</button>
-      </div>
-    `).join("");
-  }
-
-  function bindInlineSeriesEditor(editor, title) {
-    editor.querySelector("[data-close-editor]")?.addEventListener("click", () => toggleInlineSeriesEditor(title.id, false));
-    editor.querySelectorAll("input[name=cover], input[name=banner]").forEach((input) => {
-      input.addEventListener("change", async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-          const data = await imageFileToDataUrl(file, input.name === "cover" ? 900 : 1600, input.name === "cover" ? 1200 : 900);
-          const preview = editor.querySelector(input.name === "cover" ? "[data-cover-preview]" : "[data-banner-preview]");
-          if (preview) preview.src = data;
-          input.dataset.previewValue = data;
-        } catch (error) {
-          alert(error.message || "Nie udało się wczytać obrazu.");
-          input.value = "";
-        }
+    if (editButton) {
+      editButton.addEventListener("click", () => {
+        navigate("edit-series");
+        setTimeout(() => {
+          document.querySelector("#editSeriesSelect").value = title.id;
+          populateEditSeriesForm();
+        }, 0);
       });
-    });
-
-    editor.querySelectorAll("[data-add-person]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const type = button.dataset.addPerson;
-        const list = editor.querySelector(`[data-people-list="${type}"]`);
-        list.insertAdjacentHTML("beforeend", renderPersonRows([{ name: "", url: "", status: "profile" }], type === "authors" ? "author" : "artist"));
-      });
-    });
-    editor.addEventListener("click", (event) => {
-      const remove = event.target.closest("[data-remove-person]");
-      if (remove) remove.closest("[data-person-row]")?.remove();
-    });
-
-    editor.querySelectorAll("[data-editor-check]").forEach((input) => input.addEventListener("change", () => {
-      const role = input.dataset.editorCheck;
-      const group = editor.querySelectorAll(`[data-editor-check="${CSS.escape(role)}"]`);
-      if (input.checked) {
-        group.forEach((other) => { if (other !== input) other.checked = false; });
-        const none = editor.querySelector(`[data-editor-none="${CSS.escape(role)}"]`);
-        if (none) none.checked = false;
-      }
-      updateEditorSummary(editor, role);
-    }));
-    editor.querySelectorAll("[data-editor-none]").forEach((input) => input.addEventListener("change", () => {
-      const role = input.dataset.editorNone;
-      if (input.checked) editor.querySelectorAll(`[data-editor-check="${CSS.escape(role)}"]`).forEach((other) => { other.checked = false; });
-      updateEditorSummary(editor, role);
-    }));
-
-    editor.querySelector("[data-inline-series-form]").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await saveInlineSeriesEditor(title.id, event.currentTarget, editor);
-    });
-  }
-
-  function updateEditorSummary(editor, role) {
-    const checked = Array.from(editor.querySelectorAll(`[data-editor-check="${CSS.escape(role)}"]:checked`));
-    const summary = editor.querySelector(`[data-editor-summary="${CSS.escape(role)}"]`);
-    if (summary) summary.textContent = checked.length ? checked.map((input) => displayUserName(input.value)).join(", ") : "Brak";
-  }
-
-  function toggleInlineSeriesEditor(titleId, force) {
-    const editor = document.querySelector("#inlineSeriesEditor");
-    if (!editor) return;
-    const shouldOpen = typeof force === "boolean" ? force : editor.classList.contains("is-hidden");
-    editor.classList.toggle("is-hidden", !shouldOpen);
-    const button = document.querySelector(`[data-edit-title="${CSS.escape(titleId)}"]`);
-    if (button) button.setAttribute("aria-expanded", String(shouldOpen));
-    if (shouldOpen) editor.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  async function saveInlineSeriesEditor(titleId, form, editor) {
-    const title = findTitle(titleId);
-    if (!title) return;
-    const data = new FormData(form);
-    title.title = String(data.get("title") || "").trim();
-    title.description = String(data.get("description") || "").trim();
-    title.type = String(data.get("type") || "").trim();
-    title.status = String(data.get("status") || "").trim();
-    title.genres = splitList(data.get("genres"));
-
-    const coverInput = form.querySelector("input[name=cover]");
-    const bannerInput = form.querySelector("input[name=banner]");
-    if (coverInput?.dataset.previewValue) title.cover = coverInput.dataset.previewValue;
-    if (bannerInput?.dataset.previewValue) title.banner = bannerInput.dataset.previewValue;
-
-    title.authors = collectPeopleRows(editor.querySelector('[data-people-list="authors"]'));
-    title.artists = collectPeopleRows(editor.querySelector('[data-people-list="artists"]'));
-    title.translators = Array.from(editor.querySelectorAll("[data-translator-check]:checked")).map((input) => input.value);
-    title.editors = collectEditorAssignments(editor);
-
-    normalizeTitlePeople(title);
-    persistState();
-    renderAll();
-    renderTitle(title.id);
-    const freshEditor = document.querySelector("#inlineSeriesEditor");
-    if (freshEditor) toggleInlineSeriesEditor(title.id, false);
-  }
-
-  function collectPeopleRows(list) {
-    return Array.from(list?.querySelectorAll("[data-person-row]") || []).map((row) => ({
-      name: row.querySelector("[data-person-name]")?.value.trim() || "",
-      url: row.querySelector("[data-person-url]")?.value.trim() || "",
-      status: row.querySelector("[data-person-status]")?.value || "profile"
-    })).filter((person) => person.name || person.status !== "unknown");
-  }
-
-  function collectEditorAssignments(editor) {
-    return ["Cleaner", "Korektor", "Typesetter"].flatMap((role) => {
-      const checked = editor.querySelector(`[data-editor-check="${CSS.escape(role)}"]:checked`);
-      return checked ? [{ role, userId: checked.value, name: displayUserName(checked.value) }] : [];
-    });
-  }
-
-  function handleDeleteTitleFromDetail(titleId) {
-    if (!canDeleteSeries()) return;
-    const title = findTitle(titleId);
-    if (!title) return;
-    const confirmed = window.confirm(`Czy na pewno chcesz usunąć serię „${title.title}”?`);
-    if (!confirmed) return;
-    state.translations = state.translations.filter((item) => item.id !== titleId);
-    state.library = state.library.filter((id) => id !== titleId);
-    if (state.randomTitleId === titleId) state.randomTitleId = null;
-    persistState();
-    renderAll();
-    navigate("translations");
-  }
-
-  function normalizePeople(items) {
-    if (!Array.isArray(items)) return [];
-    return items.map((item) => {
-      if (typeof item === "string") {
-        const value = item.trim();
-        return { name: value, url: "", status: /^(unknown|nieznany)$/i.test(value) ? "unknown" : "profile" };
-      }
-      return {
-        name: String(item?.name || "").trim(),
-        url: String(item?.url || "").trim(),
-        status: item?.status === "none" || item?.status === "unknown" ? item.status : "profile"
-      };
-    });
-  }
-
-  function normalizeEditors(items) {
-    if (!Array.isArray(items)) return [];
-    return items.map((item) => ({
-      role: String(item?.role || "").trim(),
-      userId: String(item?.userId || "").trim(),
-      name: String(item?.name || (item?.userId ? displayUserName(item.userId) : "")).trim()
-    })).filter((item) => item.role);
-  }
-
-  function normalizeTitlePeople(title) {
-    title.authors = normalizePeople(title.authors);
-    title.artists = normalizePeople(title.artists);
-    title.editors = normalizeEditors(title.editors);
-    if (!Array.isArray(title.translators)) title.translators = [];
-  }
-
-  function renderPeopleInline(items) {
-    const people = normalizePeople(items);
-    if (!people.length) return "Brak";
-    return people.map((person) => {
-      if (person.status === "unknown") return `<span>Nieznany</span>`;
-      if (person.status === "none") return `<span>${escapeHtml(person.name || "Brak profilu")}</span>`;
-      if (person.url) return `<a class="person-link" href="${escapeAttr(person.url)}" target="_blank" rel="noreferrer">${escapeHtml(person.name || "Profil")}</a>`;
-      return `<span>${escapeHtml(person.name || "Nieznany")}</span>`;
-    }).join(", ");
-  }
-
-  function renderEditorsInline(items) {
-    const editors = normalizeEditors(items);
-    if (!editors.length) return "Brak";
-    return editors.map((editor) => `${escapeHtml(editor.role)}: ${escapeHtml(editor.name || displayUserName(editor.userId))}`).join(", ");
-  }
-
-  function getTeamPeople() {
-    const ids = [...new Set(state.team.filter((member) => member.status === "current").map((member) => member.discordId))];
-    return ids.map((id) => state.users[id] || placeholderUser(id));
-  }
-
-  function getPeopleForTitle(title) {
-    const ids = new Set(getTeamPeople().map((user) => user.id));
-    (title.translators || []).forEach((id) => ids.add(id));
-    normalizeEditors(title.editors).forEach((editor) => { if (editor.userId) ids.add(editor.userId); });
-    return Array.from(ids).map((id) => state.users[id] || placeholderUser(id));
+    }
   }
 
   function renderChapterRow(title, chapter) {
@@ -1547,6 +1237,31 @@
     renderCounters();
   }
 
+  function handleEditSeries(event) {
+    event.preventDefault();
+    const title = findTitle(document.querySelector("#editSeriesSelect").value);
+    if (!title) return;
+    title.title = document.querySelector("#editSeriesName").value.trim();
+    title.cover = document.querySelector("#editSeriesCover").value.trim();
+    title.banner = document.querySelector("#editSeriesBanner").value.trim();
+    title.description = document.querySelector("#editSeriesDescription").value.trim();
+    title.type = document.querySelector("#editSeriesType").value.trim();
+    title.status = document.querySelector("#editSeriesStatus").value;
+    title.genres = splitList(document.querySelector("#editSeriesGenres").value);
+    persistState();
+    renderAll();
+    openTitle(title.id);
+  }
+
+  function handleDeleteSeries() {
+    const titleId = document.querySelector("#editSeriesSelect").value;
+    state.translations = state.translations.filter((title) => title.id !== titleId);
+    state.library = state.library.filter((id) => id !== titleId);
+    persistState();
+    renderAll();
+    navigate("translations");
+  }
+
   function hydrateConfigForm() {
     document.querySelector("#discordClientId").value = state.discordSettings.clientId || "";
     document.querySelector("#discordRedirectUri").value = state.discordSettings.redirectUri || "";
@@ -1584,6 +1299,26 @@
     if (!title) return;
     const last = title.chapters[title.chapters.length - 1];
     document.querySelector("#chapterNumber").placeholder = last ? `Propozycja: ${suggestNextChapter(last.number)}` : "Propozycja: 1";
+  }
+
+  function populateEditSeriesSelect() {
+    const select = document.querySelector("#editSeriesSelect");
+    const previous = select.value;
+    select.innerHTML = state.translations.map((title) => `<option value="${escapeAttr(title.id)}">${escapeHtml(title.title)}</option>`).join("");
+    if (previous && state.translations.some((title) => title.id === previous)) select.value = previous;
+    populateEditSeriesForm();
+  }
+
+  function populateEditSeriesForm() {
+    const title = findTitle(document.querySelector("#editSeriesSelect").value);
+    if (!title) return;
+    document.querySelector("#editSeriesName").value = title.title;
+    document.querySelector("#editSeriesCover").value = title.cover;
+    document.querySelector("#editSeriesBanner").value = title.banner;
+    document.querySelector("#editSeriesDescription").value = title.description;
+    document.querySelector("#editSeriesType").value = title.type;
+    document.querySelector("#editSeriesStatus").value = title.status;
+    document.querySelector("#editSeriesGenres").value = title.genres.join(", ");
   }
 
   function toggleLibrary(titleId) {
@@ -1634,10 +1369,6 @@
 
   function canManageTitles() {
     return hasAnyRole(["Właściciel", "Współwłaściciel", "Administrator"]);
-  }
-
-  function canDeleteSeries() {
-    return hasAnyRole(["Właściciel", "Współwłaściciel"]);
   }
 
   function canManageChapters() {
@@ -1722,13 +1453,6 @@
       merged.discordSettings = Object.assign(clone(seedState.discordSettings), parsed.discordSettings || {});
       merged.uploadedPages = [];
       if (!Number.isInteger(merged.teamCarouselIndex)) merged.teamCarouselIndex = 0;
-      merged.translations = Array.isArray(merged.translations) ? merged.translations : [];
-      merged.translations.forEach((title) => {
-        normalizeTitlePeople(title);
-        if (title.id === "unsleep" && title.banner === title.cover) {
-          title.banner = bannerSvg("#ffd0e9", "#f391ca", "Unsleep");
-        }
-      });
       return merged;
     } catch {
       return clone(seedState);
@@ -1753,10 +1477,10 @@
       cover,
       banner: options.banner || bannerSvg("#ffd1e8", "#ffa6d8", options.title),
       description: options.description || "Opis serii pojawi się tutaj po uzupełnieniu panelu dodawania lub edycji.",
-      authors: normalizePeople(options.authors || ["Nieznany"]),
-      artists: normalizePeople(options.artists || ["Brak profilu"]),
+      authors: options.authors || ["Nieznany"],
+      artists: options.artists || ["Brak profilu"],
       translators: options.translators || ["100000000000000001"],
-      editors: normalizeEditors(options.editors || [{ role: "Korektor", name: "BunBun" }]),
+      editors: options.editors || [{ role: "Korektor", name: "BunBun" }],
       chapters: []
     };
 
@@ -1809,32 +1533,6 @@
     });
   }
 
-  function imageFileToDataUrl(file, maxWidth, maxHeight) {
-    return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith("image/")) {
-        reject(new Error("Wybierz prawidłowy plik graficzny."));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error("Nie udało się odczytać obrazu."));
-      reader.onload = () => {
-        const image = new Image();
-        image.onerror = () => reject(new Error("Nie udało się wczytać obrazu."));
-        image.onload = () => {
-          const ratio = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
-          canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL("image/jpeg", 0.86));
-        };
-        image.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
   function formatDate(dateValue) {
     const date = new Date(dateValue);
     if (Number.isNaN(date.getTime())) return dateValue;
@@ -1852,14 +1550,6 @@
 
   function initialsFor(value) {
     return Array.from(String(value || "?").trim())[0] || "?";
-  }
-
-  function pencilIcon() {
-    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.8V20h3.2L18.9 8.3l-3.2-3.2L4 16.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m14.6 6.9 2.5-2.5a1.8 1.8 0 0 1 2.5 0l.5.5a1.8 1.8 0 0 1 0 2.5l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
-  }
-
-  function trashIcon() {
-    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3m-8 0 1 13h6l1-13M10 10v7m4-7v7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
 
   function escapeHtml(value) {
