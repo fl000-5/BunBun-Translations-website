@@ -1077,3 +1077,34 @@ body > main { flex:1 0 auto; width:100%; }
 .profile-translated-section .translated-title-grid .library-item {
   width: 100%;
 }
+
+/* Biblioteczka — cały kafelek ma identyczny rozmiar jak w „Tłumaczone tytuły” */
+.library-grid .library-item,
+.profile-translated-section .translated-title-grid .library-item {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+}
+
+.library-grid .library-item .library-cover,
+.profile-translated-section .translated-title-grid .library-item .library-cover {
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.library-grid .library-item h3,
+.profile-translated-section .translated-title-grid .library-item h3 {
+  min-height: 3.1em;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 1.15rem !important;
+  line-height: 1.25;
+  padding: 12px !important;
+}
