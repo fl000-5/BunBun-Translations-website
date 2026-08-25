@@ -537,6 +537,7 @@
 
     if (fallback === "translations") renderTranslations();
     if (fallback === "profile") renderProfile();
+    if (fallback === "library") renderLibrary();
     if (fallback === "data") renderData();
     if (fallback === "add-chapter") {
       populateChapterTitleSelect();
@@ -686,8 +687,8 @@
   function normalizeChapter(chapter, title) {
     return {
       id: String(chapter.id),
-      number: String(chapter.number || "Rozdział"),
-      title: String(chapter.title || "Nowy rozdział"),
+      number: String(chapter.number || "").replace(/^Rozdział\s*/i, "").trim(),
+      title: String(chapter.title || "").trim(),
       season: String(chapter.season || ""),
       date: chapter.date || new Date().toISOString(),
       likes: Number(chapter.likes) || 0,
@@ -735,6 +736,7 @@
     const grid = document.querySelector("#latestGrid");
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
     const latestTitles = state.translations
       .map((title) => ({
         title,
@@ -742,47 +744,48 @@
           ? Math.max(...title.chapters.map((chapter) => new Date(chapter.date).getTime() || 0))
           : 0
       }))
-      .filter(({ latestDate }) => latestDate > 0 && now - latestDate <= sevenDays)
-      .sort((a,b) => b.latestDate - a.latestDate)
-      .slice(0,6);
+      .filter((item) => item.latestDate > 0 && now - item.latestDate <= sevenDays)
+      .sort((a, b) => b.latestDate - a.latestDate)
+      .slice(0, 6);
 
-    grid.innerHTML = latestTitles.map(({title}) => {
-      const chapters = title.chapters.slice()
-        .sort((a,b) => (new Date(b.date).getTime()||0) - (new Date(a.date).getTime()||0))
-        .slice(0,3)
-        .map(chapter => `
-          <button type="button" class="latest-chapter-row"
-            data-open-reader-title="${escapeAttr(title.id)}"
-            data-open-reader-chapter="${escapeAttr(chapter.id)}">
+    if (!latestTitles.length) {
+      grid.innerHTML = `<div class="latest-empty">Brak nowych rozdziałów z ostatnich 7 dni.</div>`;
+      return;
+    }
+
+    grid.innerHTML = latestTitles.map(({ title }) => {
+      const chapterRows = title.chapters
+        .slice()
+        .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
+        .slice(0, 3)
+        .map((chapter) => `
+          <button type="button" class="latest-chapter-link" data-open-reader-title="${escapeAttr(title.id)}" data-open-reader-chapter="${escapeAttr(chapter.id)}">
             <span class="latest-chapter-number">${escapeHtml(chapterDisplayName(chapter))}</span>
-            <span>${escapeHtml(formatDate(chapter.date))}</span>
-          </button>`).join("");
+            <span class="latest-chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
+          </button>
+        `).join("");
 
       return `
         <article class="latest-card">
-          <div class="latest-card-inner">
-            <button type="button" class="latest-title-button" data-open-title="${escapeAttr(title.id)}">
-              <img src="${escapeAttr(title.cover)}" alt="">
-              <div class="latest-card-body">
-                <h3>${escapeHtml(title.title)}</h3>
-                <div class="latest-chapters-list">
-                  ${chapters || `<p>Brak opublikowanych rozdziałów</p>`}
-                </div>
-              </div>
-            </button>
-          </div>
-        </article>`;
+          <button class="latest-title-button" type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
+            <img src="${escapeAttr(title.cover)}" alt="">
+            <div class="latest-card-body">
+              <h3>${escapeHtml(title.title)}</h3>
+            </div>
+          </button>
+          <div class="latest-chapters">${chapterRows}</div>
+        </article>
+      `;
     }).join("");
 
-    grid.querySelectorAll("[data-open-title]").forEach(button =>
-      button.addEventListener("click", () => openTitle(button.dataset.openTitle))
-    );
-    grid.querySelectorAll("[data-open-reader-chapter]").forEach(button =>
-      button.addEventListener("click", event => {
-        event.stopPropagation();
+    grid.querySelectorAll("[data-open-title]").forEach((button) => {
+      button.addEventListener("click", () => openTitle(button.dataset.openTitle));
+    });
+    grid.querySelectorAll("[data-open-reader-chapter]").forEach((button) => {
+      button.addEventListener("click", () => {
         location.hash = `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
-      })
-    );
+      });
+    });
   }
 
   function renderRandomTitle() {
@@ -890,13 +893,13 @@
       const renderCard = (member) => {
         const user = state.users[member.discordId] || placeholderUser(member.discordId);
         return `
-          <button type="button" class="team-card team-profile-button" data-team-profile="${escapeAttr(user.id)}" aria-label="Otwórz profil ${escapeAttr(user.displayName)}">
+          <article class="team-card">
             <img class="team-avatar" src="${escapeAttr(user.avatar)}" alt="">
-            <div>
-              <h3>${escapeHtml(user.displayName)}</h3>
+            <div class="team-card-copy">
+              <button type="button" class="team-profile-name" data-team-profile="${escapeAttr(user.id)}" aria-label="Otwórz profil ${escapeAttr(user.displayName)}">${escapeHtml(user.displayName)}</button>
               <p>${escapeHtml(member.roles.join(", "))}</p>
             </div>
-          </button>
+          </article>
         `;
       };
 
@@ -1033,6 +1036,8 @@
     }
 
     normalizeTitlePeople(title);
+    const loggedUser = currentUser();
+    if (loggedUser) state.library = loadUserLibrary(loggedUser.id);
     const inLibrary = state.library.includes(title.id);
     const staff = [
       ["Autor", renderPeopleInline(title.authors)],
@@ -1499,9 +1504,16 @@
   }
 
   function getTranslatorPeople() {
-    return Object.values(state.users).filter((user) =>
-      Array.isArray(user.roles) && user.roles.includes("Tłumacz")
-    );
+    return Object.values(state.users).filter((user) => {
+      if (!Array.isArray(user.roles) || !user.roles.includes("Tłumacz")) return false;
+      const name = String(user.displayName || "").trim().toLocaleLowerCase("pl");
+      const username = String(user.username || "").trim().toLocaleLowerCase("pl");
+      // These three accounts are not available in the translator picker.
+      if (name === "flooo" || username === "fl000_5") return false;
+      if (name === "katsumi" || username === "katsumi") return false;
+      if (name === "eri" || username === "eri") return false;
+      return true;
+    });
   }
 
   function getPeopleForTitle(title) {
@@ -1526,7 +1538,8 @@
   function chapterDisplayName(chapter) {
     const custom = String(chapter?.title || "").trim();
     if (custom && custom !== "Nowy rozdział" && !/^Tłumaczenie:/i.test(custom)) return custom;
-    return String(chapter?.number || "Rozdział");
+    const number = String(chapter?.number || "").replace(/^Rozdział\s*/i, "").trim();
+    return number ? `Rozdział ${number}` : "Rozdział";
   }
 
   function renderChapterRow(title, chapter) {
@@ -1642,10 +1655,26 @@
       renderCalendar();
     };
 
+    const positionCalendar = () => {
+      const rect = picker.getBoundingClientRect();
+      const calendarWidth = Math.min(320, window.innerWidth - 32);
+      const left = Math.max(16, Math.min(rect.left, window.innerWidth - calendarWidth - 16));
+      const estimatedHeight = 390;
+      const top = rect.bottom + 8 + estimatedHeight <= window.innerHeight
+        ? rect.bottom + 8
+        : Math.max(16, rect.top - estimatedHeight - 8);
+      calendar.style.left = `${left}px`;
+      calendar.style.top = `${top}px`;
+      calendar.style.width = `${calendarWidth}px`;
+    };
+
     const openCalendar = (event) => {
       event.stopPropagation();
       calendar.classList.toggle("is-hidden");
-      if (!calendar.classList.contains("is-hidden")) renderCalendar();
+      if (!calendar.classList.contains("is-hidden")) {
+        renderCalendar();
+        positionCalendar();
+      }
     };
     toggle.addEventListener("click", openCalendar);
     display.addEventListener("click", openCalendar);
@@ -1734,11 +1763,11 @@
               `).join("") || `<span class="editor-help">Brak osób w obecnej kadrze.</span>`}
             </div>
           </fieldset>
-          <div class="confirm-modal-actions">
-            <button type="button" class="ghost-button" data-chapter-edit-cancel>${closeIcon()}<span>Anuluj</span></button>
-            <button type="submit" class="primary-button">${pencilIcon()}<span>Zapisz edycję</span></button>
-          </div>
         </form>
+        <div class="confirm-modal-actions chapter-edit-actions">
+          <button type="button" class="ghost-button" data-chapter-edit-cancel>${closeIcon()}<span>Anuluj</span></button>
+          <button type="submit" form="chapterEditForm" class="primary-button">${saveIcon()}<span>Zapisz edycję</span></button>
+        </div>
       </div>`;
     document.body.appendChild(modal);
     document.body.classList.add("modal-open");
@@ -2136,7 +2165,7 @@
 
     const chapter = {
       id: `${title.id}-chapter-${slugify(number)}-${Date.now()}`,
-      number: `Rozdział ${number}`,
+      number,
       title: "",
       season: document.querySelector("#chapterSeason").value.trim(),
       date: document.querySelector("#chapterDate").value || new Date().toISOString(),
