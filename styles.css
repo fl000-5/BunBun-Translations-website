@@ -1062,3 +1062,18 @@ body > main { flex:1 0 auto; width:100%; }
 .profile-banner.has-color-banner {
   background-color:var(--discord-banner-color,#ffd0e9) !important;
 }
+
+/* Biblioteczka i Tłumaczone tytuły — identyczny rozmiar okładek */
+.library-grid .library-item .library-cover,
+.profile-translated-section .translated-title-grid .library-item .library-cover {
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+  display: block;
+}
+.library-grid .library-item,
+.profile-translated-section .translated-title-grid .library-item {
+  width: 100%;
+}
