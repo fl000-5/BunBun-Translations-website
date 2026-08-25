@@ -1988,10 +1988,17 @@
     });
   }
 
-  function openUserProfile(userId) {
+  async function openUserProfile(userId) {
     if (!userId) return;
     state.profileViewingUserId = String(userId);
     navigate("profile");
+
+    if (hasBackend()) {
+      try {
+        await getDiscordUser(String(userId), true);
+      } catch {}
+    }
+
     renderProfile();
   }
 
@@ -2421,7 +2428,12 @@
       role === "Czytelnik" || sourceRoles.includes(role)
     );
     next.avatar = next.avatar || avatarSvg(initialsFor(next.displayName || next.username || "?"), "#ffe1f0", "#9d3c72");
-    next.banner = next.banner || bannerSvg("#ffe0f1", "#ffa6d8", next.displayName || "BB");
+    // Do NOT create a fake banner when Discord returned null.
+    // A real user's banner can legitimately be null; renderProfile() then
+    // uses bannerColor as the background.
+    if (!Object.prototype.hasOwnProperty.call(next, "banner")) {
+      next.banner = null;
+    }
     return next;
   }
 

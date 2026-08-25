@@ -1053,3 +1053,12 @@ body > main { flex:1 0 auto; width:100%; }
   height: 100%;
   background: var(--discord-banner-color, #ffd0e9);
 }
+
+.profile-banner.has-color-banner,
+.profile-banner.has-color-banner::before,
+.profile-banner.has-color-banner::after {
+  background-image:none !important;
+}
+.profile-banner.has-color-banner {
+  background-color:var(--discord-banner-color,#ffd0e9) !important;
+}
