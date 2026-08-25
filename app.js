@@ -71,6 +71,7 @@
   const seedState = {
     currentUser: null,
     activeTeamTab: "current",
+    profileViewingUserId: null,
     teamCarouselIndex: 0,
     teamCarouselMoving: false,
     teamCarouselInitialized: false,
@@ -477,6 +478,7 @@
   }
 
   function renderAll() {
+    bindProfileNavigation();
     renderSession();
     renderLatest();
     renderRandomTitle();
@@ -546,6 +548,12 @@
   function activeViewName() {
     const active = document.querySelector(".view.is-active");
     return active ? active.dataset.viewName : "home";
+  }
+
+  function bindProfileNavigation() {
+    document.querySelectorAll('[data-view="profile"], [data-nav="profile"]').forEach((el) => {
+      el.addEventListener("click", () => { state.profileViewingUserId = null; });
+    });
   }
 
   function renderSession() {
@@ -727,64 +735,54 @@
     const grid = document.querySelector("#latestGrid");
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
-
     const latestTitles = state.translations
-      .map((title) => {
-        const latestChapter = title.chapters
-          .slice()
-          .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))[0];
-        return {
-          title,
-          latestChapter,
-          latestDate: latestChapter ? (new Date(latestChapter.date).getTime() || 0) : 0
-        };
-      })
-      .filter((item) => item.latestDate > 0 && (now - item.latestDate) <= sevenDays)
-      .sort((a, b) => b.latestDate - a.latestDate)
-      .slice(0, 6);
+      .map((title) => ({
+        title,
+        latestDate: title.chapters.length
+          ? Math.max(...title.chapters.map((chapter) => new Date(chapter.date).getTime() || 0))
+          : 0
+      }))
+      .filter(({ latestDate }) => latestDate > 0 && now - latestDate <= sevenDays)
+      .sort((a,b) => b.latestDate - a.latestDate)
+      .slice(0,6);
 
-    if (!latestTitles.length) {
-      grid.innerHTML = `<div class="latest-empty">Brak nowych rozdziałów z ostatnich 7 dni.</div>`;
-      return;
-    }
-
-    grid.innerHTML = latestTitles.map(({ title }) => {
-      const lastChapters = title.chapters
-        .slice()
-        .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
-        .slice(0, 3)
-        .map((chapter) => `
-          <button type="button"
-            class="latest-chapter-row"
+    grid.innerHTML = latestTitles.map(({title}) => {
+      const chapters = title.chapters.slice()
+        .sort((a,b) => (new Date(b.date).getTime()||0) - (new Date(a.date).getTime()||0))
+        .slice(0,3)
+        .map(chapter => `
+          <button type="button" class="latest-chapter-row"
             data-open-reader-title="${escapeAttr(title.id)}"
             data-open-reader-chapter="${escapeAttr(chapter.id)}">
-            <span>${escapeHtml(chapterDisplayName(chapter))}</span>
+            <span class="latest-chapter-number">${escapeHtml(chapterDisplayName(chapter))}</span>
             <span>${escapeHtml(formatDate(chapter.date))}</span>
-          </button>
-        `).join("");
+          </button>`).join("");
 
       return `
         <article class="latest-card">
-          <button type="button" class="latest-title-button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
-            <img src="${escapeAttr(title.cover)}" alt="">
-            <div class="latest-card-body">
-              <h3>${escapeHtml(title.title)}</h3>
-              ${lastChapters || `<p>Brak opublikowanych rozdziałów</p>`}
-            </div>
-          </button>
-        </article>
-      `;
+          <div class="latest-card-inner">
+            <button type="button" class="latest-title-button" data-open-title="${escapeAttr(title.id)}">
+              <img src="${escapeAttr(title.cover)}" alt="">
+              <div class="latest-card-body">
+                <h3>${escapeHtml(title.title)}</h3>
+                <div class="latest-chapters-list">
+                  ${chapters || `<p>Brak opublikowanych rozdziałów</p>`}
+                </div>
+              </div>
+            </button>
+          </div>
+        </article>`;
     }).join("");
 
-    grid.querySelectorAll("[data-open-title]").forEach((button) => {
-      button.addEventListener("click", () => openTitle(button.dataset.openTitle));
-    });
-    grid.querySelectorAll("[data-open-reader-chapter]").forEach((button) => {
-      button.addEventListener("click", (event) => {
+    grid.querySelectorAll("[data-open-title]").forEach(button =>
+      button.addEventListener("click", () => openTitle(button.dataset.openTitle))
+    );
+    grid.querySelectorAll("[data-open-reader-chapter]").forEach(button =>
+      button.addEventListener("click", event => {
         event.stopPropagation();
         location.hash = `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
-      });
-    });
+      })
+    );
   }
 
   function renderRandomTitle() {
@@ -892,13 +890,13 @@
       const renderCard = (member) => {
         const user = state.users[member.discordId] || placeholderUser(member.discordId);
         return `
-          <article class="team-card">
+          <button type="button" class="team-card team-profile-button" data-team-profile="${escapeAttr(user.id)}" aria-label="Otwórz profil ${escapeAttr(user.displayName)}">
             <img class="team-avatar" src="${escapeAttr(user.avatar)}" alt="">
             <div>
               <h3>${escapeHtml(user.displayName)}</h3>
               <p>${escapeHtml(member.roles.join(", "))}</p>
             </div>
-          </article>
+          </button>
         `;
       };
 
@@ -914,6 +912,9 @@
       ];
 
       track.innerHTML = `<div class="team-track-inner">${visibleAndClones.map(renderCard).join("")}</div>`;
+      track.querySelectorAll("[data-team-profile]").forEach((button) => {
+        button.addEventListener("click", () => openUserProfile(button.dataset.teamProfile));
+      });
 
       requestAnimationFrame(() => {
         const inner = track.querySelector(".team-track-inner");
@@ -1498,16 +1499,9 @@
   }
 
   function getTranslatorPeople() {
-    const ids = [...new Set(
-      state.team
-        .filter((member) => member.status === "current")
-        .filter((member) => {
-          const user = state.users[member.discordId];
-          return user?.roles?.includes("Tłumacz");
-        })
-        .map((member) => member.discordId)
-    )];
-    return ids.map((id) => state.users[id] || placeholderUser(id));
+    return Object.values(state.users).filter((user) =>
+      Array.isArray(user.roles) && user.roles.includes("Tłumacz")
+    );
   }
 
   function getPeopleForTitle(title) {
@@ -1579,7 +1573,7 @@
     return `
       <div class="custom-date-picker" data-date-picker data-value="${escapeAttr(iso)}">
         <input class="pretty-date-display" type="text" value="${escapeAttr(display)}" placeholder="Wybierz datę" readonly aria-label="Data">
-        <input type="hidden" name="date" data-date-value value="${escapeAttr(iso)}" required>
+        <input type="hidden" name="date" data-date-value value="${escapeAttr(iso)}">
         <button type="button" class="date-picker-toggle" data-date-toggle aria-label="Wybierz datę">${calendarIcon()}</button>
         <div class="custom-calendar is-hidden" data-calendar></div>
       </div>`;
@@ -1648,11 +1642,13 @@
       renderCalendar();
     };
 
-    toggle.addEventListener("click", (event) => {
+    const openCalendar = (event) => {
       event.stopPropagation();
       calendar.classList.toggle("is-hidden");
       if (!calendar.classList.contains("is-hidden")) renderCalendar();
-    });
+    };
+    toggle.addEventListener("click", openCalendar);
+    display.addEventListener("click", openCalendar);
 
     calendar.addEventListener("click", (event) => {
       const button = event.target.closest("[data-calendar-day]");
@@ -1710,7 +1706,7 @@
               !/^Tłumaczenie:/i.test(chapter.title)
                 ? chapter.title
                 : ""
-            )}" placeholder="np. Spotkanie">
+            )}" placeholder="np. Side Story">
           </label>
           <div class="chapter-edit-two-columns">
             <label>
@@ -1879,35 +1875,68 @@
     });
   }
 
+  function libraryStorageKey(userId) {
+    return `BUNBUN_LIBRARY_${String(userId)}`;
+  }
+
+  function loadUserLibrary(userId) {
+    try {
+      const value = JSON.parse(localStorage.getItem(libraryStorageKey(userId)) || "[]");
+      return Array.isArray(value) ? value.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveUserLibrary(userId, library) {
+    try {
+      localStorage.setItem(libraryStorageKey(userId), JSON.stringify([...new Set(library)]));
+    } catch {}
+  }
+
   function renderLibrary() {
     const container = document.querySelector("#libraryDetail");
     if (!container) return;
     const user = currentUser();
     if (!user) {
-      container.innerHTML = `<div class="profile-tile"><h2>Zaloguj się, aby zobaczyć swoją biblioteczkę.</h2></div>`;
+      container.innerHTML = `<div class="library-login-message">Zaloguj się, aby zobaczyć swoją biblioteczkę.</div>`;
       return;
     }
+
+    state.library = loadUserLibrary(user.id);
     const titles = state.library.map(findTitle).filter(Boolean);
     container.innerHTML = `
-      <section class="profile-tile">
-        <div class="library-grid">
-          ${titles.length ? titles.map((title) => `
-            <button class="library-item" type="button" data-library-title="${escapeAttr(title.id)}">
-              <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
-              <h3>${escapeHtml(title.title)}</h3>
-            </button>
-          `).join("") : `<p>Nie masz jeszcze tytułów w bibliotece.</p>`}
-        </div>
-      </section>
+      <div class="team-title home-section-title library-page-heading">
+        <span></span>
+        <h2>Biblioteczka</h2>
+        <span></span>
+      </div>
+      <div class="library-grid">
+        ${titles.length ? titles.map((title) => `
+          <button class="library-item" type="button" data-library-title="${escapeAttr(title.id)}">
+            <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
+            <h3>${escapeHtml(title.title)}</h3>
+          </button>
+        `).join("") : `<p class="library-empty">Nie masz jeszcze tytułów w biblioteczce.</p>`}
+      </div>
     `;
     container.querySelectorAll("[data-library-title]").forEach((button) => {
       button.addEventListener("click", () => openTitle(button.dataset.libraryTitle));
     });
   }
 
+  function openUserProfile(userId) {
+    if (!userId) return;
+    state.profileViewingUserId = String(userId);
+    navigate("profile");
+    renderProfile();
+  }
+
   function renderProfile() {
     const container = document.querySelector("#profileDetail");
-    const user = currentUser();
+    const user = state.profileViewingUserId
+      ? (state.users[state.profileViewingUserId] || placeholderUser(state.profileViewingUserId))
+      : currentUser();
     if (!user) {
       container.innerHTML = `
         <div class="profile-shell">
@@ -1928,7 +1957,9 @@
 
     container.innerHTML = `
       <article class="profile-shell">
-        <div class="profile-banner"><img src="${escapeAttr(user.banner || "")}" alt=""></div>
+        <div class="profile-banner">
+          <img src="${escapeAttr(user.banner || user.bannerUrl || bannerSvg("#ffd0e9", "#f391ca", user.displayName || "B"))}" alt="">
+        </div>
         <div class="profile-body">
           <div class="profile-header-row">
             <img class="profile-avatar" src="${escapeAttr(user.avatar)}" alt="">
@@ -1943,7 +1974,11 @@
 
       ${translated.length ? `
         <section class="profile-translated-section">
-          <h2>Tłumaczone tytuły</h2>
+          <div class="team-title home-section-title">
+            <span></span>
+            <h2>Tłumaczone tytuły</h2>
+            <span></span>
+          </div>
           <div class="library-grid translated-title-grid">
             ${translated.map((title) => `
               <button class="library-item" type="button" data-profile-title="${escapeAttr(title.id)}">
@@ -2204,18 +2239,18 @@
   }
 
   function toggleLibrary(titleId) {
-    if (!currentUser()) {
+    const user = currentUser();
+    if (!user) {
       loginAs("100000000000000001");
+      return;
     }
-
-    if (state.library.includes(titleId)) {
-      state.library = state.library.filter((id) => id !== titleId);
-    } else {
-      state.library.push(titleId);
-    }
-    persistState();
+    state.library = loadUserLibrary(user.id);
+    state.library = state.library.includes(titleId)
+      ? state.library.filter((id) => id !== titleId)
+      : [...state.library, titleId];
+    saveUserLibrary(user.id, state.library);
     renderTitle(titleId);
-    renderProfile();
+    renderLibrary();
   }
 
   function toggleChapterLike(titleId, chapterId) {
