@@ -682,21 +682,39 @@
         .map((chapter) => `<p>${escapeHtml(chapter.number)} · ${escapeHtml(formatDate(chapter.date))}</p>`)
         .join("");
 
+      const chapterRows = title.chapters
+        .slice()
+        .sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0))
+        .slice(0, 3)
+        .map((chapter) => `
+          <button type="button" class="latest-chapter-link" data-open-reader-title="${escapeAttr(title.id)}" data-open-reader-chapter="${escapeAttr(chapter.id)}">
+            <span>${escapeHtml(chapter.number)}</span>
+            <span>${escapeHtml(formatDate(chapter.date))}</span>
+          </button>
+        `).join("");
+
       return `
         <article class="latest-card">
           <button type="button" data-open-title="${escapeAttr(title.id)}" aria-label="Otwórz ${escapeAttr(title.title)}">
             <img src="${escapeAttr(title.cover)}" alt="">
             <div class="latest-card-body">
               <h3>${escapeHtml(title.title)}</h3>
-              ${lastChapters || `<p>Brak opublikowanych rozdziałów</p>`}
             </div>
           </button>
+          <div class="latest-chapters">
+            ${chapterRows || `<p>Brak opublikowanych rozdziałów</p>`}
+          </div>
         </article>
       `;
     }).join("");
 
     grid.querySelectorAll("[data-open-title]").forEach((button) => {
       button.addEventListener("click", () => openTitle(button.dataset.openTitle));
+    });
+    grid.querySelectorAll("[data-open-reader-chapter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        location.hash = `#reader/${encodeURIComponent(button.dataset.openReaderTitle)}/${encodeURIComponent(button.dataset.openReaderChapter)}`;
+      });
     });
   }
 
@@ -1460,14 +1478,35 @@
         <div class="confirm-modal-icon">${pencilIcon()}</div>
         <h2 id="chapterEditHeading">Edytuj rozdział</h2>
         <form id="chapterEditForm" class="chapter-edit-form">
-          <label>Numer rozdziału<input name="number" value="${escapeAttr(String(chapter.number).replace(/^Rozdział\\s*/i, ""))}" required></label>
-          <label>Nazwa / opis<input name="title" value="${escapeAttr(chapter.title || "")}"></label>
-          <label>Data<input name="date" type="date" value="${escapeAttr(String(chapter.date || "").slice(0,10))}"></label>
-          <label>Tłumacze
-            <select name="translators" multiple>${getPeopleForTitle(title).map((user) =>
-              `<option value="${escapeAttr(user.id)}" ${(chapter.translators || []).includes(user.id) ? "selected" : ""}>${escapeHtml(user.displayName)}</option>`
-            ).join("")}</select>
+          <div class="chapter-edit-two-columns">
+            <label>
+              Numer rozdziału
+              <input name="number" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(String(chapter.number).replace(/^Rozdział\\s*/i, ""))}" required>
+            </label>
+            <label>
+              Numer sezonu
+              <input name="season" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(chapter.season || "")}">
+            </label>
+          </div>
+          <label>
+            Data
+            <span class="date-input-wrap">
+              <input name="date" class="pretty-date-input" type="date" value="${escapeAttr(String(chapter.date || "").slice(0,10))}" required>
+              <span class="date-input-icon">${calendarIcon()}</span>
+            </span>
           </label>
+          <fieldset class="chapter-translator-fieldset">
+            <legend>Tłumacz</legend>
+            <div class="pretty-check-grid chapter-translator-checks">
+              ${getPeopleForTitle(title).map((user) => `
+                <label class="pretty-check">
+                  <input type="checkbox" name="translators" value="${escapeAttr(user.id)}" ${(chapter.translators || []).includes(user.id) ? "checked" : ""}>
+                  <span class="pretty-check-box">${checkIcon()}</span>
+                  <span>${escapeHtml(user.displayName)}</span>
+                </label>
+              `).join("") || `<span class="editor-help">Brak osób w obecnej kadrze.</span>`}
+            </div>
+          </fieldset>
           <div class="confirm-modal-actions">
             <button type="button" class="ghost-button" data-chapter-edit-cancel>${closeIcon()}<span>Anuluj</span></button>
             <button type="submit" class="primary-button">${pencilIcon()}<span>Zapisz edycję</span></button>
@@ -1490,9 +1529,10 @@
       const updated = {
         ...chapter,
         number: `Rozdział ${String(data.get("number") || "").trim()}`,
-        title: String(data.get("title") || "").trim() || "Nowy rozdział",
+        title: chapter.title || "Nowy rozdział",
+        season: String(data.get("season") || "").trim(),
         date: data.get("date") ? `${data.get("date")}T00:00:00.000Z` : chapter.date,
-        translators: Array.from(form.querySelector("[name=translators]").selectedOptions).map((option) => option.value)
+        translators: Array.from(form.querySelectorAll("[name=translators]:checked")).map((input) => input.value)
       };
       try {
         const response = await fetch(apiUrl(`/api/chapters/${encodeURIComponent(chapter.id)}`), {
@@ -2267,7 +2307,7 @@
       toast = document.createElement("div");
       toast.id = "bunbunToast";
       toast.className = "bunbun-toast";
-      toast.innerHTML = `<span class="toast-icon">!</span><span data-toast-text></span>`;
+      toast.innerHTML = `<span class="toast-icon">${saveIcon()}</span><span data-toast-text></span>`;
       document.body.appendChild(toast);
     }
     toast.querySelector("[data-toast-text]").textContent = message;
@@ -2286,6 +2326,18 @@
 
   function dotsIcon() {
     return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>`;
+  }
+
+  function saveIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h11l3 3V20.5H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 3.5v6h7v-6M8.5 20.5v-6h7v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  }
+
+  function calendarIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 3.5v4M17 3.5v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+  }
+
+  function checkIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
 
   function pencilIcon() {
