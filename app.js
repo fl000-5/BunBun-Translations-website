@@ -1885,7 +1885,68 @@
   function persistState() {
     const safe = clone(state);
     safe.uploadedPages = [];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+
+    // Nie zapisujemy ciężkich obrazów jako data:image/... w localStorage.
+    // Okładki/banery są przechowywane na backendzie, a panele rozdziałów
+    // po publikacji pochodzą bezpośrednio z Discord CDN. Trzymanie ich
+    // dodatkowo w przeglądarce szybko przekracza limit Storage.
+    if (Array.isArray(safe.translations)) {
+      safe.translations = safe.translations.map((title) => {
+        const next = { ...title };
+
+        if (typeof next.cover === "string" && next.cover.startsWith("data:")) {
+          next.cover = "";
+        }
+        if (typeof next.banner === "string" && next.banner.startsWith("data:")) {
+          next.banner = "";
+        }
+
+        if (Array.isArray(next.chapters)) {
+          next.chapters = next.chapters.map((chapter) => {
+            const c = { ...chapter };
+
+            if (typeof c.cover === "string" && c.cover.startsWith("data:")) {
+              c.cover = "";
+            }
+
+            if (Array.isArray(c.pages)) {
+              c.pages = c.pages.filter((page) =>
+                typeof page === "string" && !page.startsWith("data:")
+              );
+            }
+
+            return c;
+          });
+        }
+
+        return next;
+      });
+    }
+
+    const serialized = JSON.stringify(safe);
+
+    try {
+      localStorage.setItem(STORAGE_KEY, serialized);
+    } catch (error) {
+      // Storage jest tylko lokalnym cachem. Jego przekroczenie nie może
+      // anulować poprawnie wykonanego zapisu na backendzie/Discordzie.
+      if (error?.name === "QuotaExceededError" || String(error).includes("quota")) {
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            currentUser: safe.currentUser,
+            users: safe.users,
+            discordSettings: safe.discordSettings,
+            translations: []
+          }));
+        } catch {
+          // Ignorujemy brak miejsca w Storage — dane główne są na backendzie.
+        }
+        console.warn("Pominięto część lokalnego cache z powodu limitu Storage.");
+      } else {
+        console.warn("Nie udało się zapisać lokalnego cache:", error);
+      }
+    }
   }
 
   function makeTranslation(options) {
