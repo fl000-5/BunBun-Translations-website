@@ -133,8 +133,9 @@ h1, h2, h3, p { margin-top: 0; }
 .team-tabs button { min-height: 38px; padding: 0 24px; border: 1px solid var(--pink); border-radius: 4px; background: white; color: var(--pink); font-weight: 950; }
 .team-tabs button.is-active { background: var(--pink); color: white; }
 .team-carousel { position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
-.team-track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, calc((100% - 48px) / 3)); gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 16px 4px 28px; scroll-behavior: smooth; }
-.team-track::-webkit-scrollbar { display: none; }
+.team-track { position: relative; overflow: hidden; padding: 16px 4px 28px; }
+.team-track-inner { display: flex; gap: 24px; width: 100%; will-change: transform; }
+.team-track .team-card { flex: 0 0 calc((min(100%, 1280px) - 48px) / 3); }
 .team-empty { min-height: 290px; display: grid; place-items: center; color: var(--muted); font-weight: 850; border: 1px dashed var(--line); border-radius: var(--radius); background: #fffafd; }
 .team-card { position: relative; scroll-snap-align: center; min-height: 290px; display: grid; justify-items: center; align-content: center; gap: 18px; padding: 34px 22px; border: 0; border-radius: 4px; background: var(--surface-pink); box-shadow: var(--shadow); color: var(--pink-deep); text-align: center; }
 .team-avatar { width: 128px; height: 128px; border-radius: 50%; object-fit: cover; overflow: hidden; background: linear-gradient(145deg, #f59ed2, #ffd6ea); }
@@ -270,7 +271,7 @@ select[multiple] { min-height: 116px; }
   .hero-panel { min-height: auto; }
   .welcome-bunny { width: min(380px, 100%); }
   .counter-band, .filters-panel.is-open, .latest-grid, .two-columns, .role-grid { grid-template-columns: 1fr 1fr; }
-  .team-track { grid-auto-columns: minmax(260px, 86%); }
+  .team-track .team-card { flex-basis: calc((100% - 24px) / 2); }
   .title-cover { margin-top: -50px; }
   .profile-avatar { width: 132px; height: 132px; }
   .chapter-card { grid-template-columns: 62px minmax(0, 1fr) auto; }
@@ -285,6 +286,7 @@ select[multiple] { min-height: 116px; }
   .latest-card button { grid-template-columns: 112px minmax(0, 1fr); }
   .latest-card img { width: 112px; min-height: 170px; }
   .team-carousel { grid-template-columns: 34px minmax(0, 1fr) 34px; }
+  .team-track .team-card { flex-basis: calc(100% - 8px); }
   .chapter-card { grid-template-columns: 58px minmax(0, 1fr); }
   .chapter-date, .heart-button { justify-self: start; grid-column: 2; }
   .reader-bar, .list-toolbar, .panel-heading, .section-heading { display: grid; justify-items: start; }

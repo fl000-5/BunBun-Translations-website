@@ -721,40 +721,51 @@
 
     const track = document.querySelector("#teamTrack");
     const members = state.team.filter((member) => member.status === state.activeTeamTab);
-    if (state.teamCarouselIndex < 0 || state.teamCarouselIndex >= members.length) state.teamCarouselIndex = 0;
 
-    const renderCard = (member, hidden = false) => {
-      const user = state.users[member.discordId] || placeholderUser(member.discordId);
-      return `
-        <article class="team-card" ${hidden ? 'aria-hidden="true"' : ''}>
-          <img class="team-avatar" src="${escapeAttr(user.avatar)}" alt="">
-          <div>
-            <h3>${escapeHtml(user.displayName)}</h3>
-            <p>${escapeHtml(member.roles.join(", "))}</p>
-          </div>
-        </article>
-      `;
-    };
-
-    // Three copies create a real circular sequence: ... Mika → Flooo → Katsumi ...
-    // The middle copy is the visible starting point; when either edge is reached
-    // the scroll position is silently recentered to the identical copy.
-    track.innerHTML = members.length
-      ? [0, 1, 2].flatMap(() => members.map((member, index) => renderCard(member, true))).join("")
-      : `<div class="team-empty">Brak osób w tej kadrze.</div>`;
-
-    requestAnimationFrame(() => {
-      if (!members.length) return;
-      const firstCard = track.querySelector(".team-card");
-      const gap = 24;
-      const step = firstCard.offsetWidth + gap;
-      const absoluteIndex = members.length + state.teamCarouselIndex;
-      const targetCard = track.querySelectorAll(".team-card")[absoluteIndex];
-      if (targetCard) {
-        const targetLeft = targetCard.offsetLeft - track.clientWidth / 2 + targetCard.offsetWidth / 2;
-        track.scrollLeft = Math.max(0, targetLeft);
+    if (!members.length) {
+      track.innerHTML = `<div class="team-empty">Brak osób w tej kadrze.</div>`;
+    } else {
+      if (state.teamCarouselIndex < 0 || state.teamCarouselIndex >= members.length) {
+        state.teamCarouselIndex = 0;
       }
-    });
+
+      const index = state.teamCarouselIndex;
+
+      const renderCard = (member) => {
+        const user = state.users[member.discordId] || placeholderUser(member.discordId);
+        return `
+          <article class="team-card">
+            <img class="team-avatar" src="${escapeAttr(user.avatar)}" alt="">
+            <div>
+              <h3>${escapeHtml(user.displayName)}</h3>
+              <p>${escapeHtml(member.roles.join(", "))}</p>
+            </div>
+          </article>
+        `;
+      };
+
+      // We always keep one extra card on each side of the three visible cards.
+      // The carousel moves only one card per click. After the animation, the
+      // contents are rotated and the track is silently returned to the center.
+      const visibleAndClones = [
+        members[(index - 1 + members.length) % members.length],
+        members[index % members.length],
+        members[(index + 1) % members.length],
+        members[(index + 2) % members.length],
+        members[(index + 3) % members.length]
+      ];
+
+      track.innerHTML = `<div class="team-track-inner">${visibleAndClones.map(renderCard).join("")}</div>`;
+
+      requestAnimationFrame(() => {
+        const inner = track.querySelector(".team-track-inner");
+        const firstCard = inner?.querySelector(".team-card");
+        if (!inner || !firstCard) return;
+        const step = firstCard.offsetWidth + 24;
+        inner.style.transition = "none";
+        inner.style.transform = `translate3d(${-step}px, 0, 0)`;
+      });
+    }
 
     const adminList = document.querySelector("#teamAdminList");
     adminList.innerHTML = state.team.map((member) => {
@@ -778,59 +789,36 @@
     renderSession();
   }
 
-  function getTeamCarouselMetrics() {
-    const track = document.querySelector("#teamTrack");
-    if (!track) return null;
-    const firstCard = track.querySelector(".team-card");
-    if (!firstCard) return null;
-    const gap = 24;
-    const step = firstCard.offsetWidth + gap;
-    const members = state.team.filter((member) => member.status === state.activeTeamTab);
-    return { track, step, membersCount: members.length };
-  }
-
   function moveTeamCarousel(direction) {
-    const metrics = getTeamCarouselMetrics();
-    if (!metrics || metrics.membersCount <= 1 || state.teamCarouselMoving) return;
+    const track = document.querySelector("#teamTrack");
+    const members = state.team.filter((member) => member.status === state.activeTeamTab);
+    if (!track || members.length <= 1 || state.teamCarouselMoving) return;
 
-    const { track, step, membersCount } = metrics;
-    const current = state.teamCarouselIndex || 0;
-    const currentAbsolute = membersCount + current;
-    const targetAbsolute = currentAbsolute + direction;
-    const cards = track.querySelectorAll(".team-card");
-    const targetCard = cards[targetAbsolute];
-    if (!targetCard) return;
+    const inner = track.querySelector(".team-track-inner");
+    const firstCard = inner?.querySelector(".team-card");
+    if (!inner || !firstCard) return;
+
+    const step = firstCard.offsetWidth + 24;
+    const targetX = direction > 0 ? -step * 2 : 0;
 
     state.teamCarouselMoving = true;
-    state.teamCarouselIndex = (current + direction + membersCount) % membersCount;
+    inner.style.transition = "transform 450ms ease";
+    inner.style.transform = `translate3d(${targetX}px, 0, 0)`;
 
-    // Move exactly one card. When crossing the end/start, use the adjacent
-    // clone, so Mika -> Flooo is still a normal one-card animation.
-    const targetLeft = targetCard.offsetLeft - track.clientWidth / 2 + targetCard.offsetWidth / 2;
-    track.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+    const finish = () => {
+      inner.removeEventListener("transitionend", finish);
 
-    window.setTimeout(() => {
-      // Re-center on the identical visual card only after the animation has
-      // finished. Because the clone is identical, the user sees no jump.
-      if (direction > 0 && targetAbsolute >= membersCount * 2) {
-        const resetCard = cards[membersCount + state.teamCarouselIndex];
-        if (resetCard) {
-          track.scrollTo({
-            left: resetCard.offsetLeft - track.clientWidth / 2 + resetCard.offsetWidth / 2,
-            behavior: "auto"
-          });
-        }
-      } else if (direction < 0 && targetAbsolute < membersCount) {
-        const resetCard = cards[membersCount + state.teamCarouselIndex];
-        if (resetCard) {
-          track.scrollTo({
-            left: resetCard.offsetLeft - track.clientWidth / 2 + resetCard.offsetWidth / 2,
-            behavior: "auto"
-          });
-        }
-      }
+      state.teamCarouselIndex =
+        (state.teamCarouselIndex + direction + members.length) % members.length;
+
+      // Re-rendering rotates the sequence around the new first member.
+      // The track is then positioned in the exact same visual place without
+      // any visible jump.
+      renderTeam();
       state.teamCarouselMoving = false;
-    }, 500);
+    };
+
+    inner.addEventListener("transitionend", finish, { once: true });
   }
 
   function renderGenreOptions() {
