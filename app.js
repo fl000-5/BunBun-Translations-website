@@ -822,14 +822,16 @@
     const adult = document.querySelector("#adultFilter").checked;
     const query = state.titleQuery.toLowerCase();
 
-    const filtered = state.translations.filter((title) => {
-      if (query && !title.title.toLowerCase().includes(query)) return false;
-      if (type !== "all" && title.type !== type) return false;
-      if (status !== "all" && title.status !== status) return false;
-      if (genre !== "all" && !title.genres.includes(genre)) return false;
-      if (!adult && title.adult) return false;
-      return true;
-    });
+    const filtered = state.translations
+      .filter((title) => {
+        if (query && !title.title.toLowerCase().includes(query)) return false;
+        if (type !== "all" && title.type !== type) return false;
+        if (status !== "all" && title.status !== status) return false;
+        if (genre !== "all" && !title.genres.includes(genre)) return false;
+        if (!adult && title.adult) return false;
+        return true;
+      })
+      .sort((a, b) => a.title.localeCompare(b.title, "pl", { sensitivity: "base" }));
 
     grid.innerHTML = filtered.map((title) => `
       <article class="translation-card">
@@ -887,10 +889,10 @@
                   ${inLibrary ? "W bibliotece" : "Dodaj do biblioteki"}
                 </button>
                 ${canEdit ? `<button class="ghost-button icon-text-button" type="button" data-edit-title="${escapeAttr(title.id)}" aria-expanded="false">
-                  ${pencilIcon()}<span>Edytuj serię</span>
+                  ${pencilIcon()}<span>Edytuj tytuł</span>
                 </button>` : ""}
                 ${canDelete ? `<button class="danger-button icon-text-button" type="button" data-delete-title="${escapeAttr(title.id)}">
-                  ${trashIcon()}<span>Usuń serię</span>
+                  ${trashIcon()}<span>Usuń tytuł</span>
                 </button>` : ""}
               </div>
             </div>
@@ -984,18 +986,28 @@
     }).join("");
 
     return `
-      <section class="inline-editor is-hidden" id="inlineSeriesEditor" aria-label="Edycja serii">
+      <section class="inline-editor is-hidden" id="inlineSeriesEditor" aria-label="Edycja tytułu">
         <div class="inline-editor-head">
           <div>
-            <h2>Edytuj serię</h2>
-            <p>Zmiany zapisują się w danych strony po kliknięciu przycisku na dole.</p>
+            <h2>Edytuj tytuł</h2>
+            <p>Edytuj wszystkie informacje o tytule. Zmiany zapisują się po kliknięciu przycisku na dole.</p>
           </div>
           <button class="icon-button" type="button" data-close-editor aria-label="Zamknij edycję">×</button>
         </div>
         <form class="series-editor-form" data-inline-series-form>
-          <label>
-            Tytuł
-            <input name="title" value="${escapeAttr(title.title)}" required>
+          <div class="two-columns">
+            <label>
+              Tytuł
+              <input name="title" value="${escapeAttr(title.title)}" required>
+            </label>
+            <label>
+              ID kanału Discord
+              <input name="channelId" value="${escapeAttr(title.channelId || "")}" placeholder="np. 123456789012345678">
+            </label>
+          </div>
+          <label class="checkbox-row editor-adult-check">
+            <input name="adult" type="checkbox" ${title.adult ? "checked" : ""}>
+            Pokaż jako tytuł 18+
           </label>
           <div class="media-edit-grid">
             <div class="media-editor-card">
@@ -1135,9 +1147,9 @@
     if (!editor) return;
     const shouldOpen = typeof force === "boolean" ? force : editor.classList.contains("is-hidden");
     editor.classList.toggle("is-hidden", !shouldOpen);
+    document.body.classList.toggle("modal-open", shouldOpen);
     const button = document.querySelector(`[data-edit-title="${CSS.escape(titleId)}"]`);
     if (button) button.setAttribute("aria-expanded", String(shouldOpen));
-    if (shouldOpen) editor.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function saveInlineSeriesEditor(titleId, form, editor) {
@@ -1145,6 +1157,8 @@
     if (!title) return;
     const data = new FormData(form);
     title.title = String(data.get("title") || "").trim();
+    title.channelId = String(data.get("channelId") || "").trim();
+    title.adult = data.get("adult") === "on";
     title.description = String(data.get("description") || "").trim();
     title.type = String(data.get("type") || "").trim();
     title.status = String(data.get("status") || "").trim();
@@ -1187,14 +1201,39 @@
     if (!canDeleteSeries()) return;
     const title = findTitle(titleId);
     if (!title) return;
-    const confirmed = window.confirm(`Czy na pewno chcesz usunąć serię „${title.title}”?`);
-    if (!confirmed) return;
-    state.translations = state.translations.filter((item) => item.id !== titleId);
-    state.library = state.library.filter((id) => id !== titleId);
-    if (state.randomTitleId === titleId) state.randomTitleId = null;
-    persistState();
-    renderAll();
-    navigate("translations");
+
+    document.querySelector("#deleteTitleModal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "deleteTitleModal";
+    modal.className = "confirm-modal-backdrop";
+    modal.innerHTML = `
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="deleteTitleHeading">
+        <div class="confirm-modal-icon">${trashIcon()}</div>
+        <h2 id="deleteTitleHeading">Na pewno chcesz usunąć ten tytuł?</h2>
+        <p>„${escapeHtml(title.title)}” zostanie usunięty z listy tytułów.</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="ghost-button" data-delete-no>${closeIcon()}<span>Nie</span></button>
+          <button type="button" class="danger-button confirm-danger" data-delete-yes>${trashIcon()}<span>Tak</span></button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    document.body.classList.add("modal-open");
+
+    const close = () => {
+      modal.remove();
+      if (!document.querySelector("#inlineSeriesEditor:not(.is-hidden)")) document.body.classList.remove("modal-open");
+    };
+    modal.querySelector("[data-delete-no]")?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    modal.querySelector("[data-delete-yes]")?.addEventListener("click", () => {
+      state.translations = state.translations.filter((item) => item.id !== titleId);
+      state.library = state.library.filter((id) => id !== titleId);
+      if (state.randomTitleId === titleId) state.randomTitleId = null;
+      close();
+      persistState();
+      renderAll();
+      navigate("translations");
+    });
   }
 
   function normalizePeople(items) {
@@ -1262,10 +1301,9 @@
     const liked = state.likedChapters.includes(chapter.id);
     return `
       <button class="chapter-card ${read ? "is-read" : ""}" type="button" data-open-reader="${escapeAttr(chapter.id)}">
-        <img class="chapter-thumb" src="${escapeAttr(chapter.cover || title.cover)}" alt="">
         <span class="chapter-info">
           <h3>${escapeHtml(chapter.number)}</h3>
-          <p>${escapeHtml(chapter.title)}</p>
+          <p>${escapeHtml((chapter.translators || title.translators || []).map(displayUserName).join(", ") || "Brak")}</p>
         </span>
         <span class="chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
         <span class="heart-button ${liked ? "is-liked" : ""}" data-like-chapter="${escapeAttr(chapter.id)}">♥ ${chapter.likes}</span>
@@ -1441,7 +1479,8 @@
       type: document.querySelector("#newTitleType").value,
       status: document.querySelector("#newTitleStatus").value,
       genres: splitList(document.querySelector("#newTitleGenres").value),
-      adult: false,
+      adult: Boolean(document.querySelector("#newTitleAdult")?.checked),
+      channelId: document.querySelector("#newTitleChannelId")?.value.trim() || "",
       cover,
       banner,
       description: document.querySelector("#newTitleDescription").value.trim(),
@@ -1750,6 +1789,7 @@
       status: options.status || "Aktywna",
       genres: options.genres || ["Romans"],
       adult: Boolean(options.adult),
+      channelId: String(options.channelId || ""),
       cover,
       banner: options.banner || bannerSvg("#ffd1e8", "#ffa6d8", options.title),
       description: options.description || "Opis serii pojawi się tutaj po uzupełnieniu panelu dodawania lub edycji.",
@@ -1856,6 +1896,10 @@
 
   function pencilIcon() {
     return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.8V20h3.2L18.9 8.3l-3.2-3.2L4 16.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m14.6 6.9 2.5-2.5a1.8 1.8 0 0 1 2.5 0l.5.5a1.8 1.8 0 0 1 0 2.5l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+  }
+
+  function closeIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`;
   }
 
   function trashIcon() {
