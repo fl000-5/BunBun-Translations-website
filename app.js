@@ -1150,7 +1150,8 @@
   }
 
   function renderInlineSeriesEditor(title) {
-    const translatorUsers = getPeopleForTitle(title);
+    const translatorUsers = getTranslatorPeople();
+    const staffUsers = getPeopleForChapterEditor(title);
     const authors = normalizePeople(title.authors);
     const artists = normalizePeople(title.artists);
     const editors = normalizeEditors(title.editors);
@@ -1164,7 +1165,7 @@
 
     const editorRoleBlocks = ["Cleaner", "Korektor", "Typesetter"].map((role) => {
       const selected = editors.filter((item) => item.role === role).map((item) => item.userId).filter(Boolean);
-      const people = translatorUsers.map((user) => `
+      const people = staffUsers.map((user) => `
         <label class="pretty-check editor-person-check">
           <input type="checkbox" data-editor-check="${escapeAttr(role)}" value="${escapeAttr(user.id)}" ${selected.includes(user.id) ? "checked" : ""}>
           <span class="pretty-check-box"></span>
@@ -1421,6 +1422,7 @@
       </div>`;
     document.body.appendChild(modal);
     document.body.classList.add("modal-open");
+    bindCustomDatePicker(modal.querySelector("[data-date-picker]"));
 
     const close = () => {
       modal.remove();
@@ -1571,6 +1573,121 @@
     container?.querySelectorAll("[data-chapter-menu][aria-expanded=true]").forEach((node) => node.setAttribute("aria-expanded", "false"));
   }
 
+  function renderCustomDatePicker(value) {
+    const iso = String(value || "").slice(0, 10);
+    const display = iso ? formatPrettyDate(iso) : "";
+    return `
+      <div class="custom-date-picker" data-date-picker data-value="${escapeAttr(iso)}">
+        <input class="pretty-date-display" type="text" value="${escapeAttr(display)}" placeholder="Wybierz datę" readonly aria-label="Data">
+        <input type="hidden" name="date" data-date-value value="${escapeAttr(iso)}" required>
+        <button type="button" class="date-picker-toggle" data-date-toggle aria-label="Wybierz datę">${calendarIcon()}</button>
+        <div class="custom-calendar is-hidden" data-calendar></div>
+      </div>`;
+  }
+
+  function formatPrettyDate(iso) {
+    const parts = String(iso || "").split("-");
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : "";
+  }
+
+  function bindCustomDatePicker(picker) {
+    if (!picker) return;
+    const display = picker.querySelector("[data-date-display]") || picker.querySelector(".pretty-date-display");
+    const hidden = picker.querySelector("[data-date-value]");
+    const toggle = picker.querySelector("[data-date-toggle]");
+    const calendar = picker.querySelector("[data-calendar]");
+    let selected = hidden.value || "";
+    let cursor = selected ? new Date(`${selected}T12:00:00`) : new Date();
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+
+    const monthNames = ["styczeń","luty","marzec","kwiecień","maj","czerwiec","lipiec","sierpień","wrzesień","październik","listopad","grudzień"];
+    const dayNames = ["pon","wt","śr","czw","pt","sob","nie"];
+
+    function renderCalendar() {
+      const year = cursor.getFullYear();
+      const month = cursor.getMonth();
+      const first = new Date(year, month, 1);
+      const start = (first.getDay() + 6) % 7;
+      const days = new Date(year, month + 1, 0).getDate();
+      const prevDays = new Date(year, month, 0).getDate();
+
+      let cells = "";
+      for (let i = 0; i < start; i++) {
+        const day = prevDays - start + i + 1;
+        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}">${day}</button>`;
+      }
+      for (let day = 1; day <= days; day++) {
+        const iso = `${year}-${String(month + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+        const cls = `${iso === selected ? " is-selected" : ""}${iso === new Date().toISOString().slice(0,10) ? " is-today" : ""}`;
+        cells += `<button type="button" class="calendar-day${cls}" data-calendar-day="${iso}">${day}</button>`;
+      }
+      const total = Math.ceil((start + days) / 7) * 7;
+      for (let i = start + days, day = 1; i < total; i++, day++) {
+        cells += `<button type="button" class="calendar-day is-muted" data-calendar-day="${year}-${String(month + 2).padStart(2,"0")}-${String(day).padStart(2,"0")}">${day}</button>`;
+      }
+
+      calendar.innerHTML = `
+        <div class="custom-calendar-head">
+          <button type="button" data-calendar-prev aria-label="Poprzedni miesiąc">‹</button>
+          <strong>${monthNames[month]} ${year}</strong>
+          <button type="button" data-calendar-next aria-label="Następny miesiąc">›</button>
+        </div>
+        <div class="custom-calendar-week">${dayNames.map((day) => `<span>${day}</span>`).join("")}</div>
+        <div class="custom-calendar-grid">${cells}</div>
+        <div class="custom-calendar-foot">
+          <button type="button" data-calendar-clear>Wyczyść</button>
+          <button type="button" data-calendar-today>Dzisiaj</button>
+        </div>`;
+    }
+
+    const setDate = (iso) => {
+      selected = iso || "";
+      hidden.value = selected;
+      display.value = formatPrettyDate(selected);
+      picker.dataset.value = selected;
+      renderCalendar();
+    };
+
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      calendar.classList.toggle("is-hidden");
+      if (!calendar.classList.contains("is-hidden")) renderCalendar();
+    });
+
+    calendar.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-calendar-day]");
+      if (button) {
+        const iso = button.dataset.calendarDay;
+        const date = new Date(`${iso}T12:00:00`);
+        if (date.getMonth() !== cursor.getMonth()) {
+          cursor = new Date(date.getFullYear(), date.getMonth(), 1);
+        }
+        setDate(iso);
+        calendar.classList.add("is-hidden");
+        return;
+      }
+      if (event.target.closest("[data-calendar-prev]")) {
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+        renderCalendar();
+      }
+      if (event.target.closest("[data-calendar-next]")) {
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        renderCalendar();
+      }
+      if (event.target.closest("[data-calendar-clear]")) setDate("");
+      if (event.target.closest("[data-calendar-today]")) {
+        const today = new Date().toISOString().slice(0,10);
+        cursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        setDate(today);
+        calendar.classList.add("is-hidden");
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!picker.contains(event.target)) calendar.classList.add("is-hidden");
+    }, { once: false });
+  }
+
   function openChapterEditor(titleId, chapterId) {
     const title = findTitle(titleId);
     const chapter = title?.chapters.find((item) => item.id === chapterId);
@@ -1587,12 +1704,18 @@
         <form id="chapterEditForm" class="chapter-edit-form">
           <label>
             Nazwa rozdziału
-            <input name="title" type="text" value="${escapeAttr(chapter.title && chapter.title !== "Nowy rozdział" ? chapter.title : "")}" placeholder="np. Spotkanie">
+            <input name="title" type="text" value="${escapeAttr(
+              chapter.title &&
+              chapter.title !== "Nowy rozdział" &&
+              !/^Tłumaczenie:/i.test(chapter.title)
+                ? chapter.title
+                : ""
+            )}" placeholder="np. Spotkanie">
           </label>
           <div class="chapter-edit-two-columns">
             <label>
               Numer rozdziału
-              <input name="number" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(String(chapter.number).replace(/^Rozdział\\s*/i, ""))}" required>
+              <input name="number" type="number" min="0" step="1" inputmode="numeric" value="${escapeAttr(String(chapter.number ?? "").replace(/^Rozdział\s*/i, "").trim())}" required>
             </label>
             <label>
               Numer sezonu
@@ -1601,15 +1724,12 @@
           </div>
           <label>
             Data
-            <span class="date-input-wrap">
-              <input name="date" class="pretty-date-input" type="date" value="${escapeAttr(String(chapter.date || "").slice(0,10))}" required>
-              <span class="date-input-icon">${calendarIcon()}</span>
-            </span>
+            ${renderCustomDatePicker(chapter.date)}
           </label>
           <fieldset class="chapter-translator-fieldset">
             <legend>Tłumacz</legend>
             <div class="pretty-check-grid chapter-translator-checks">
-              ${getPeopleForChapterEditor(title).map((user) => `
+              ${getTranslatorPeople().map((user) => `
                 <label class="pretty-check">
                   <input type="checkbox" name="translators" value="${escapeAttr(user.id)}" ${(chapter.translators || []).includes(user.id) ? "checked" : ""}>
                   <span class="pretty-check-box">${checkIcon()}</span>
@@ -1982,7 +2102,7 @@
     const chapter = {
       id: `${title.id}-chapter-${slugify(number)}-${Date.now()}`,
       number: `Rozdział ${number}`,
-      title: selectedTranslators.length ? `Tłumaczenie: ${selectedTranslators.map(displayUserName).join(", ")}` : "Nowy rozdział",
+      title: "",
       season: document.querySelector("#chapterSeason").value.trim(),
       date: document.querySelector("#chapterDate").value || new Date().toISOString(),
       likes: 0,

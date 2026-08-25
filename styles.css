@@ -654,3 +654,36 @@ body.modal-open::before {
 .date-input-wrap { position: relative; display: block; }
 .date-input-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none; border: 2px solid var(--pink-deep); border-radius: 4px; box-sizing: border-box; }
 .date-input-wrap::before { content: ""; position: absolute; z-index: 1; right: 17px; top: calc(50% - 5px); width: 12px; height: 2px; background: var(--pink-deep); pointer-events: none; }
+
+/* Profile / translated titles */
+.profile-translated-section h2 { font-family: inherit; font-size: clamp(1.8rem, 3vw, 2.7rem); color: #111; font-weight: 950; }
+.translated-title-grid .library-item h3 { font-size: 1.05rem; }
+
+/* Chapter editor: rounded outer shell; only inner form scrolls. */
+.chapter-edit-modal { max-height: min(86vh, 820px); overflow: hidden !important; border-radius: 20px !important; }
+.chapter-edit-modal .chapter-edit-form { max-height: calc(min(86vh, 820px) - 105px); overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--pink) #fff0f8; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; }
+.chapter-edit-modal .chapter-edit-form::-webkit-scrollbar { width: 9px; }
+.chapter-edit-modal .chapter-edit-form::-webkit-scrollbar-track { margin: 4px 2px 8px; border-radius: 999px; background: #fff0f8; }
+.chapter-edit-modal .chapter-edit-form::-webkit-scrollbar-thumb { border: 2px solid #fff0f8; border-radius: 999px; background: var(--pink); }
+
+/* Custom date picker */
+.custom-date-picker { position: relative; }
+.pretty-date-display { width: 100%; min-height: 48px; padding: 12px 52px 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fffafd; color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; box-sizing: border-box; }
+.pretty-date-display::placeholder { color: var(--muted); }
+.date-picker-toggle { position: absolute; right: 8px; top: 7px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--pink-deep); cursor: pointer; }
+.date-picker-toggle:hover { background: #ffe7f3; }
+.date-picker-toggle svg { width: 19px; height: 19px; }
+.custom-calendar { position: absolute; z-index: 1000; left: 0; top: calc(100% + 7px); width: min(330px, 100%); padding: 12px; border: 1px solid #efb9d5; border-radius: 16px; background: #fff; box-shadow: 0 18px 45px rgba(80,30,60,.18); }
+.custom-calendar.is-hidden { display: none; }
+.custom-calendar-head { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 5px; margin-bottom: 10px; text-align: center; color: var(--ink); }
+.custom-calendar-head button, .custom-calendar-foot button { border: 0; background: #fff0f8; color: var(--pink-deep); border-radius: 9px; min-height: 32px; font: inherit; font-weight: 900; cursor: pointer; }
+.custom-calendar-head button:hover, .custom-calendar-foot button:hover { background: #ffd9eb; }
+.custom-calendar-week, .custom-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.custom-calendar-week { margin-bottom: 4px; color: var(--muted); font-size: .76rem; font-weight: 900; text-align: center; }
+.calendar-day { min-height: 34px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); font: inherit; font-weight: 750; cursor: pointer; }
+.calendar-day:hover { background: #ffe5f1; color: var(--pink-deep); }
+.calendar-day.is-selected { background: var(--pink); color: #fff; }
+.calendar-day.is-today { box-shadow: inset 0 0 0 1.5px var(--pink); }
+.calendar-day.is-muted { color: #c5a9b8; }
+.custom-calendar-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.custom-calendar-foot button { padding: 6px 10px; }
