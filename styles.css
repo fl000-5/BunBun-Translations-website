@@ -466,3 +466,70 @@ body.modal-open::before {
 }
 .inline-editor::before { display: none; }
 .danger-button.icon-text-button { color: #fff; }
+
+/* Rozdziały — menu akcji */
+.chapter-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.chapter-main-button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; min-width: 0; padding: 8px 4px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.chapter-main-button:hover { background: transparent; }
+.chapter-card-actions { display: flex; align-items: center; gap: 8px; }
+.chapter-menu-wrap { position: relative; }
+.chapter-menu-button { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--muted); cursor: pointer; }
+.chapter-menu-button:hover { color: var(--pink-deep); border-color: var(--pink); background: #fff6fb; }
+.chapter-menu-button .action-icon { width: 19px; height: 19px; }
+.chapter-menu { position: absolute; right: 0; top: calc(100% + 7px); z-index: 20; min-width: 190px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 16px 40px rgba(92,38,72,.16); }
+.chapter-menu.is-hidden { display: none; }
+.chapter-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 10px 11px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-weight: 800; text-align: left; cursor: pointer; }
+.chapter-menu button:hover { background: #fff0f8; color: var(--pink-deep); }
+.chapter-menu button:last-child:hover { color: #c93562; background: #fff1f3; }
+.chapter-menu .action-icon { width: 17px; height: 17px; }
+
+.chapter-edit-modal { width: min(560px, 100%); text-align: left; }
+.chapter-edit-modal > .confirm-modal-icon { margin-left: 0; }
+.chapter-edit-modal h2 { text-align: left; }
+.chapter-edit-form { display: grid; gap: 13px; margin-top: 18px; }
+.chapter-edit-form label { display: grid; gap: 6px; color: var(--ink); font-weight: 850; }
+.chapter-edit-form input, .chapter-edit-form select { width: 100%; box-sizing: border-box; }
+.chapter-edit-form select { min-height: 120px; }
+.chapter-edit-form .confirm-modal-actions { margin-top: 8px; justify-content: flex-end; }
+
+.bunbun-toast {
+  position: fixed;
+  left: 22px;
+  bottom: 22px;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 44px));
+  padding: 12px 16px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.97);
+  color: var(--ink);
+  box-shadow: 0 16px 42px rgba(92,38,72,.18);
+  font-weight: 800;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.bunbun-toast.is-visible { opacity: 1; transform: translateY(0); }
+.toast-icon {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0f8;
+  color: var(--pink-deep);
+  border: 1px solid rgba(184,72,136,.22);
+  font-weight: 950;
+}
+
+@media (max-width: 620px) {
+  .chapter-main-button { grid-template-columns: 1fr; }
+  .chapter-date { text-align: left; }
+  .chapter-card-actions { align-self: start; }
+  .bunbun-toast { left: 14px; bottom: 14px; max-width: calc(100vw - 28px); }
+}

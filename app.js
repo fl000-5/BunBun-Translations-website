@@ -81,7 +81,8 @@
       clientId: "",
       redirectUri: "https://twojadomena.pl/api/auth/discord/callback",
       countChannelId: "",
-      translatorRoleId: ""
+      translatorRoleId: "",
+      helperRoleId: ""
     },
     users: clone(mockDiscordUsers),
     team: [
@@ -709,7 +710,7 @@
       <img class="random-title-banner" src="${escapeAttr(title.banner)}" alt="">
       <div class="random-title-body">
         <h3>${escapeHtml(title.title)}</h3>
-        <p>${escapeHtml(title.description)}</p>
+        <p>${escapeHtml(excerptText(title.description, 180))}</p>
         <div class="random-actions">
           <button class="primary-button" type="button" data-random-title="${escapeAttr(title.id)}">Przejdź do tytułu</button>
           <button class="ghost-button random-refresh" type="button" data-reroll-title>Losuj ponownie</button>
@@ -735,6 +736,7 @@
     const translators = new Set();
     state.translations.forEach((title) => title.translators.forEach((id) => translators.add(id)));
     document.querySelector("#translatorCount").textContent = translators.size;
+    document.querySelector("#helperCount").textContent = 0;
     document.querySelector("#seriesCount").textContent = state.translations.length;
     document.querySelector("#chapterCount").textContent = chapters;
 
@@ -746,16 +748,34 @@
     try {
       const params = new URLSearchParams({
         channelId: state.discordSettings.countChannelId || "",
-        translatorRoleId: state.discordSettings.translatorRoleId || ""
+        translatorRoleId: state.discordSettings.translatorRoleId || "",
+        helperRoleId: state.discordSettings.helperRoleId || ""
       });
       const response = await fetch(apiUrl(`${DISCORD_STATS}?${params}`), { credentials: "include" });
       if (!response.ok) return;
       const data = await response.json();
       if (typeof data.members === "number") document.querySelector("#discordMembers").textContent = data.members;
       if (typeof data.translators === "number") document.querySelector("#translatorCount").textContent = data.translators;
+      if (typeof data.helpers === "number") document.querySelector("#helperCount").textContent = data.helpers;
     } catch {
       document.querySelector("#discordMembers").textContent = fallbackMembers;
     }
+  }
+
+  async function hydrateTeamUsers() {
+    if (!hasBackend()) return;
+    const members = [...state.team];
+    await Promise.all(members.map(async (member) => {
+      if (!member.discordId) return;
+      try {
+        const user = await getDiscordUser(member.discordId, true);
+        if (user?.id) state.users[user.id] = ensureReaderRole(user);
+      } catch {
+        // Pozostawiamy istniejące dane lokalne, jeśli Discord chwilowo nie odpowiada.
+      }
+    }));
+    persistState();
+    renderTeam();
   }
 
   function renderTeam() {
@@ -994,6 +1014,35 @@
         event.stopPropagation();
         toggleChapterLike(title.id, button.dataset.likeChapter);
         renderTitle(title.id);
+      });
+    });
+    container.querySelectorAll("[data-chapter-menu]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const id = button.dataset.chapterMenu;
+        const panel = container.querySelector(`[data-chapter-menu-panel="${CSS.escape(id)}"]`);
+        container.querySelectorAll(".chapter-menu.is-open").forEach((node) => node.classList.remove("is-open"));
+        container.querySelectorAll("[data-chapter-menu][aria-expanded=true]").forEach((node) => node.setAttribute("aria-expanded", "false"));
+        if (panel) {
+          const opening = !panel.classList.contains("is-open");
+          panel.classList.toggle("is-open", opening);
+          panel.classList.toggle("is-hidden", !opening);
+          button.setAttribute("aria-expanded", String(opening));
+        }
+      });
+    });
+    container.querySelectorAll("[data-edit-chapter]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeChapterMenus(container);
+        openChapterEditor(title.id, button.dataset.editChapter);
+      });
+    });
+    container.querySelectorAll("[data-delete-chapter]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeChapterMenus(container);
+        handleDeleteChapter(title.id, button.dataset.deleteChapter);
       });
     });
 
@@ -1239,6 +1288,7 @@
     renderTitle(title.id);
     const freshEditor = document.querySelector("#inlineSeriesEditor");
     if (freshEditor) toggleInlineSeriesEditor(title.id, false);
+    showToast("Wszystkie zmiany zostały zapisane.");
   }
 
   function collectPeopleRows(list) {
@@ -1361,16 +1411,162 @@
   function renderChapterRow(title, chapter) {
     const read = state.readChapters.includes(chapter.id);
     const liked = state.likedChapters.includes(chapter.id);
+    const canEdit = canManageChapters();
     return `
-      <button class="chapter-card ${read ? "is-read" : ""}" type="button" data-open-reader="${escapeAttr(chapter.id)}">
-        <span class="chapter-info">
-          <h3>${escapeHtml(chapter.number)}</h3>
-          <p>${escapeHtml((chapter.translators || title.translators || []).map(displayUserName).join(", ") || "Brak")}</p>
+      <article class="chapter-card ${read ? "is-read" : ""}" data-chapter-card="${escapeAttr(chapter.id)}">
+        <button class="chapter-main-button" type="button" data-open-reader="${escapeAttr(chapter.id)}">
+          <span class="chapter-info">
+            <h3>${escapeHtml(chapter.number)}</h3>
+            <p>${escapeHtml((chapter.translators || title.translators || []).map(displayUserName).join(", ") || "Brak")}</p>
+          </span>
+          <span class="chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
+        </button>
+        <span class="chapter-card-actions">
+          <button class="heart-button ${liked ? "is-liked" : ""}" type="button" data-like-chapter="${escapeAttr(chapter.id)}">♥ ${chapter.likes}</button>
+          ${canEdit ? `
+          <div class="chapter-menu-wrap">
+            <button class="chapter-menu-button" type="button" data-chapter-menu="${escapeAttr(chapter.id)}" aria-label="Opcje rozdziału" aria-expanded="false">
+              ${dotsIcon()}
+            </button>
+            <div class="chapter-menu is-hidden" data-chapter-menu-panel="${escapeAttr(chapter.id)}">
+              <button type="button" data-edit-chapter="${escapeAttr(chapter.id)}">${pencilIcon()}<span>Edytuj rozdział</span></button>
+              <button type="button" data-delete-chapter="${escapeAttr(chapter.id)}">${trashIcon()}<span>Usuń rozdział</span></button>
+            </div>
+          </div>` : ""}
         </span>
-        <span class="chapter-date">${escapeHtml(formatDate(chapter.date))}</span>
-        <span class="heart-button ${liked ? "is-liked" : ""}" data-like-chapter="${escapeAttr(chapter.id)}">♥ ${chapter.likes}</span>
-      </button>
+      </article>
     `;
+  }
+
+  function closeChapterMenus(container) {
+    container?.querySelectorAll(".chapter-menu.is-open").forEach((node) => {
+      node.classList.remove("is-open");
+      node.classList.add("is-hidden");
+    });
+    container?.querySelectorAll("[data-chapter-menu][aria-expanded=true]").forEach((node) => node.setAttribute("aria-expanded", "false"));
+  }
+
+  function openChapterEditor(titleId, chapterId) {
+    const title = findTitle(titleId);
+    const chapter = title?.chapters.find((item) => item.id === chapterId);
+    if (!title || !chapter) return;
+
+    document.querySelector("#chapterEditModal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "chapterEditModal";
+    modal.className = "confirm-modal-backdrop";
+    modal.innerHTML = `
+      <div class="confirm-modal chapter-edit-modal" role="dialog" aria-modal="true" aria-labelledby="chapterEditHeading">
+        <div class="confirm-modal-icon">${pencilIcon()}</div>
+        <h2 id="chapterEditHeading">Edytuj rozdział</h2>
+        <form id="chapterEditForm" class="chapter-edit-form">
+          <label>Numer rozdziału<input name="number" value="${escapeAttr(String(chapter.number).replace(/^Rozdział\\s*/i, ""))}" required></label>
+          <label>Nazwa / opis<input name="title" value="${escapeAttr(chapter.title || "")}"></label>
+          <label>Data<input name="date" type="date" value="${escapeAttr(String(chapter.date || "").slice(0,10))}"></label>
+          <label>Tłumacze
+            <select name="translators" multiple>${getPeopleForTitle(title).map((user) =>
+              `<option value="${escapeAttr(user.id)}" ${(chapter.translators || []).includes(user.id) ? "selected" : ""}>${escapeHtml(user.displayName)}</option>`
+            ).join("")}</select>
+          </label>
+          <div class="confirm-modal-actions">
+            <button type="button" class="ghost-button" data-chapter-edit-cancel>${closeIcon()}<span>Anuluj</span></button>
+            <button type="submit" class="primary-button">${pencilIcon()}<span>Zapisz edycję</span></button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(modal);
+    document.body.classList.add("modal-open");
+
+    const close = () => {
+      modal.remove();
+      if (!document.querySelector("#inlineSeriesEditor:not(.is-hidden)")) document.body.classList.remove("modal-open");
+    };
+    modal.querySelector("[data-chapter-edit-cancel]")?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    modal.querySelector("#chapterEditForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const updated = {
+        ...chapter,
+        number: `Rozdział ${String(data.get("number") || "").trim()}`,
+        title: String(data.get("title") || "").trim() || "Nowy rozdział",
+        date: data.get("date") ? `${data.get("date")}T00:00:00.000Z` : chapter.date,
+        translators: Array.from(form.querySelector("[name=translators]").selectedOptions).map((option) => option.value)
+      };
+      try {
+        const response = await fetch(apiUrl(`/api/chapters/${encodeURIComponent(chapter.id)}`), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ titleId, chapter: updated })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `chapter_edit_${response.status}`);
+        const index = title.chapters.findIndex((item) => item.id === chapter.id);
+        if (index >= 0) title.chapters[index] = normalizeChapter(payload.chapter || updated, title);
+        persistState();
+        close();
+        renderTitle(title.id);
+        renderLatest();
+        showToast("Zmiany rozdziału zostały zapisane.");
+      } catch (error) {
+        alert(`Nie udało się edytować rozdziału.\\n\\n${error.message || "Nieznany błąd."}`);
+      }
+    });
+  }
+
+  async function handleDeleteChapter(titleId, chapterId) {
+    if (!canManageChapters()) return;
+    const title = findTitle(titleId);
+    const chapter = title?.chapters.find((item) => item.id === chapterId);
+    if (!title || !chapter) return;
+
+    document.querySelector("#deleteChapterModal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "deleteChapterModal";
+    modal.className = "confirm-modal-backdrop";
+    modal.innerHTML = `
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="deleteChapterHeading">
+        <div class="confirm-modal-icon">${trashIcon()}</div>
+        <h2 id="deleteChapterHeading">Na pewno chcesz usunąć ten rozdział?</h2>
+        <p>„${escapeHtml(chapter.number)}” zostanie usunięty ze strony.</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="ghost-button" data-delete-chapter-no>${closeIcon()}<span>Nie</span></button>
+          <button type="button" class="danger-button confirm-danger" data-delete-chapter-yes>${trashIcon()}<span>Tak</span></button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    document.body.classList.add("modal-open");
+    const close = () => {
+      modal.remove();
+      if (!document.querySelector("#inlineSeriesEditor:not(.is-hidden)")) document.body.classList.remove("modal-open");
+    };
+    modal.querySelector("[data-delete-chapter-no]")?.addEventListener("click", close);
+    modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+    modal.querySelector("[data-delete-chapter-yes]")?.addEventListener("click", async () => {
+      try {
+        const response = await fetch(apiUrl(`/api/chapters/${encodeURIComponent(chapterId)}`), {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ titleId })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `chapter_delete_${response.status}`);
+        title.chapters = title.chapters.filter((item) => item.id !== chapterId);
+        state.readChapters = state.readChapters.filter((id) => id !== chapterId);
+        state.likedChapters = state.likedChapters.filter((id) => id !== chapterId);
+        persistState();
+        close();
+        renderTitle(title.id);
+        renderLatest();
+        renderCounters();
+        showToast("Rozdział został usunięty ze strony.");
+      } catch (error) {
+        alert(`Nie udało się usunąć rozdziału.\\n\\n${error.message || "Nieznany błąd."}`);
+      }
+    });
   }
 
   function renderReader(titleId, chapterId) {
@@ -1690,6 +1886,7 @@
     state.discordSettings.redirectUri = document.querySelector("#discordRedirectUri").value.trim();
     state.discordSettings.countChannelId = document.querySelector("#discordCountChannelId").value.trim();
     state.discordSettings.translatorRoleId = document.querySelector("#discordTranslatorRoleId").value.trim();
+    state.discordSettings.helperRoleId = document.querySelector("#discordHelperRoleId").value.trim();
     persistState();
     renderCounters();
   }
@@ -1699,6 +1896,7 @@
     document.querySelector("#discordRedirectUri").value = state.discordSettings.redirectUri || "";
     document.querySelector("#discordCountChannelId").value = state.discordSettings.countChannelId || "";
     document.querySelector("#discordTranslatorRoleId").value = state.discordSettings.translatorRoleId || "";
+    document.querySelector("#discordHelperRoleId").value = state.discordSettings.helperRoleId || "";
   }
 
   function populatePeopleSelects() {
@@ -1813,8 +2011,8 @@
     return user.displayName;
   }
 
-  async function getDiscordUser(discordId) {
-    if (state.users[discordId]) return state.users[discordId];
+  async function getDiscordUser(discordId, force = false) {
+    if (state.users[discordId] && !force) return state.users[discordId];
     if (hasBackend()) {
       try {
         const response = await fetch(apiUrl(`${DISCORD_USER}${encodeURIComponent(discordId)}`), { credentials: "include" });
@@ -2061,6 +2259,33 @@
 
   function initialsFor(value) {
     return Array.from(String(value || "?").trim())[0] || "?";
+  }
+
+  function showToast(message) {
+    let toast = document.querySelector("#bunbunToast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "bunbunToast";
+      toast.className = "bunbun-toast";
+      toast.innerHTML = `<span class="toast-icon">!</span><span data-toast-text></span>`;
+      document.body.appendChild(toast);
+    }
+    toast.querySelector("[data-toast-text]").textContent = message;
+    toast.classList.add("is-visible");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove("is-visible"), 3600);
+  }
+
+  function excerptText(value, maxLength = 180) {
+    const text = String(value || "").replace(/\\s+/g, " ").trim();
+    if (text.length <= maxLength) return text;
+    const cut = text.slice(0, maxLength);
+    const lastSpace = cut.lastIndexOf(" ");
+    return `${(lastSpace > 80 ? cut.slice(0, lastSpace) : cut).trim()}…`;
+  }
+
+  function dotsIcon() {
+    return `<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>`;
   }
 
   function pencilIcon() {
