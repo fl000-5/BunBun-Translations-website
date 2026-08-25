@@ -1974,7 +1974,7 @@
         <h2>Biblioteczka</h2>
         <span></span>
       </div>
-      <div class="library-grid">
+      <div class="library-grid translated-title-grid">
         ${titles.length ? titles.map((title) => `
           <button class="library-item" type="button" data-library-title="${escapeAttr(title.id)}">
             <img class="library-cover" src="${escapeAttr(title.cover)}" alt="">
