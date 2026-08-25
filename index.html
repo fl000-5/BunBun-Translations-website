@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BunBun Translations</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="Logo">
+        <img src="assets/logo.png" alt="BunBun Translations">
+      </a>
+
+      <nav class="main-nav" aria-label="Główne menu">
+        <a href="#home" data-nav="home">Strona główna</a>
+        <a href="#translations" data-nav="translations">Lista tłumaczeń</a>
+      </nav>
+
+      <form class="title-search" id="searchForm" role="search">
+        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <input id="titleSearch" type="search" placeholder="Szukaj tytułów" autocomplete="off">
+      </form>
+
+      <div class="session-slot">
+        <button class="login-button" id="loginButton" type="button">Zaloguj</button>
+
+        <div class="user-menu is-hidden" id="userMenu">
+          <button class="user-trigger" id="userTrigger" type="button" aria-expanded="false">
+            <img id="userMenuAvatar" alt="" class="user-menu-avatar">
+            <span id="userMenuName"></span>
+          </button>
+          <div class="user-dropdown" id="userDropdown">
+            <button type="button" data-view="profile">Profil</button>
+            <button type="button" data-admin-action="add-title">Dodaj nowy tytuł</button>
+            <button type="button" data-admin-action="add-chapter">Dodaj nowy rozdział</button>
+            <button type="button" data-admin-action="data">Dane</button>
+            <button type="button" id="logoutButton">Wyloguj</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="social-links" aria-label="Media społecznościowe">
+        <a href="https://discord.com/" target="_blank" rel="noreferrer" aria-label="Discord">Dc</a>
+        <a href="https://instagram.com/" target="_blank" rel="noreferrer" aria-label="Instagram">Ig</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="view is-active" id="homeView" data-view-name="home">
+        <div class="hero-panel">
+          <div class="hero-copy">
+            <h1>Rozdziały i serie w jednym miejscu.</h1>
+            <p>
+              Wrzucaj tytuły, publikuj rozdziały, zbieraj ekipę i prowadź bibliotekę czytelników w jednej różowej bazie.
+            </p>
+          </div>
+          <figure class="welcome-bunny"><img src="assets/welcome-bunny.png" alt="BunBun"></figure>
+        </div>
+
+        <div class="home-grid">
+          <section class="latest-strip" aria-label="Nowe rozdziały">
+            <div class="team-title home-section-title">
+              <span></span>
+              <h2>Nowe rozdziały</h2>
+              <span></span>
+            </div>
+            <div id="latestGrid" class="latest-grid"></div>
+          </section>
+
+          <aside class="random-title" id="randomTitle"></aside>
+        </div>
+
+        <section class="important-numbers" aria-label="Ważne liczby">
+          <div class="team-title home-section-title">
+            <span></span>
+            <h2>Ważne liczby</h2>
+            <span></span>
+          </div>
+          <div class="counter-band" aria-label="Liczniki">
+          <article>
+            <span id="discordMembers">0</span>
+            <p>osób na Discordzie</p>
+          </article>
+          <article>
+            <span id="translatorCount">0</span>
+            <p>tłumaczy</p>
+          </article>
+          <article>
+            <span id="seriesCount">0</span>
+            <p>tłumaczonych serii</p>
+          </article>
+          <article>
+            <span id="chapterCount">0</span>
+            <p>przetłumaczonych rozdziałów</p>
+          </article>
+          </div>
+        </section>
+
+        <section class="team-section" aria-label="Nasz zespół">
+          <div class="team-title home-section-title">
+            <span></span>
+            <h2>Nasz zespół</h2>
+            <span></span>
+          </div>
+
+          <div class="team-tabs" role="tablist" aria-label="Kadry">
+            <button class="is-active" type="button" data-team-tab="current">Obecna kadra</button>
+            <button type="button" data-team-tab="past">Była kadra</button>
+          </div>
+
+          <div class="team-carousel">
+            <button class="team-arrow" type="button" data-team-prev aria-label="Poprzednia osoba">‹</button>
+            <div class="team-track" id="teamTrack"></div>
+            <button class="team-arrow" type="button" data-team-next aria-label="Następna osoba">›</button>
+          </div>
+
+          <div class="team-manager is-hidden" id="teamManager">
+            <div class="section-heading">
+              <h3>Zarządzanie kadrą</h3>
+              <p>Wpisujesz ID konta Discord, a nazwa i avatar są pobierane z profilu.</p>
+            </div>
+            <form id="teamForm" class="editor-grid">
+              <input type="hidden" id="teamMemberId">
+              <label>
+                ID konta Discord
+                <input id="teamDiscordId" required placeholder="np. 100000000000000001">
+              </label>
+              <label>
+                Role w ekipie
+                <input id="teamRoles" required placeholder="Tłumacz, Korektor">
+              </label>
+              <label>
+                Kadra
+                <select id="teamStatus">
+                  <option value="current">Obecna</option>
+                  <option value="past">Była</option>
+                </select>
+              </label>
+              <button class="primary-button" type="submit">Zapisz osobę</button>
+            </form>
+            <div class="team-admin-list" id="teamAdminList"></div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="translationsView" data-view-name="translations">
+        <div class="team-title home-section-title translations-title">
+          <span></span>
+          <h2>Nasze tłumaczenia</h2>
+          <span></span>
+        </div>
+
+        <form class="filters-panel" id="filtersPanel">
+          <label>
+            Typ
+            <select id="typeFilter">
+              <option value="all">Wszystkie</option>
+              <option value="Manhwa">Manhwa</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="statusFilter">
+              <option value="all">Wszystkie</option>
+              <option value="Aktywna">Aktywna</option>
+              <option value="Zawieszona">Zawieszona</option>
+              <option value="Planowana">Planowana</option>
+              <option value="Zakończona">Zakończona</option>
+              <option value="Porzucona">Porzucona</option>
+            </select>
+          </label>
+          <label>
+            Gatunek
+            <select id="genreFilter"></select>
+          </label>
+          <label class="checkbox-row">
+            <input id="adultFilter" type="checkbox">
+            Pokaż treści 18+
+          </label>
+        </form>
+
+        <div class="translation-grid" id="translationGrid"></div>
+      </section>
+
+      <section class="view" id="titleView" data-view-name="title">
+        <button class="ghost-button back-button" type="button" data-view="translations">← Wróć do tytułów</button>
+        <div id="titleDetail"></div>
+      </section>
+
+      <section class="view" id="readerView" data-view-name="reader">
+        <div id="readerDetail"></div>
+      </section>
+
+      <section class="view" id="profileView" data-view-name="profile">
+        <div id="profileDetail"></div>
+      </section>
+
+      <section class="view" id="addTitleView" data-view-name="add-title">
+        <div class="panel-heading">
+          <h1>Dodaj nowy tytuł</h1>
+          <p>Osobny formularz do zakładania serii.</p>
+        </div>
+        <form id="addTitleForm" class="form-shell">
+          <label>
+            Nazwa
+            <input id="newTitleName" required>
+          </label>
+          <label>
+            Okładka
+            <input id="newTitleCover" type="file" accept="image/*" required>
+          </label>
+          <label>
+            Baner
+            <input id="newTitleBanner" type="file" accept="image/*" required>
+          </label>
+          <label>
+            Opis
+            <textarea id="newTitleDescription" rows="5" required></textarea>
+          </label>
+
+          <div class="two-columns">
+            <fieldset>
+              <legend>Autor/Autorzy</legend>
+              <input id="newTitleAuthors" required placeholder="Nazwy lub linki do X">
+              <label class="checkbox-row"><input id="authorUnknown" type="checkbox"> Nieznany</label>
+              <label class="checkbox-row"><input id="authorNoProfile" type="checkbox"> Brak profilu</label>
+            </fieldset>
+            <fieldset>
+              <legend>Artysta/Artyści</legend>
+              <input id="newTitleArtists" required placeholder="Nazwy lub linki do X">
+              <label class="checkbox-row"><input id="artistUnknown" type="checkbox"> Nieznany</label>
+              <label class="checkbox-row"><input id="artistNoProfile" type="checkbox"> Brak profilu</label>
+            </fieldset>
+          </div>
+
+          <label>
+            Tłumacz
+            <select id="newTitleTranslators" multiple required></select>
+          </label>
+          <label>
+            Edycja
+            <input id="newTitleEditors" placeholder="ID lub nazwy osób, np. Cleaner: eri">
+          </label>
+          <div class="two-columns">
+            <label>
+              Typ
+              <select id="newTitleType" required>
+                <option>Manhwa</option>
+              </select>
+            </label>
+            <label>
+              Status tłumaczenia
+              <select id="newTitleStatus" required>
+                <option>Aktywna</option>
+                <option>Zawieszona</option>
+                <option>Planowana</option>
+                <option>Zakończona</option>
+                <option>Porzucona</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Gatunki
+            <input id="newTitleGenres" required placeholder="Romans, Dramat, Fantasy">
+          </label>
+          <button class="primary-button" type="submit">Dodaj tytuł</button>
+        </form>
+      </section>
+
+      <section class="view" id="addChapterView" data-view-name="add-chapter">
+        <div class="panel-heading">
+          <h1>Dodaj nowy rozdział</h1>
+          <p>Publikacja jest natychmiastowa, jeśli nie wybierzesz daty.</p>
+        </div>
+        <form id="addChapterForm" class="form-shell">
+          <label>
+            Tytuł
+            <select id="chapterTitleSelect" required></select>
+          </label>
+          <label>
+            Numer rozdziału
+            <input id="chapterNumber" required placeholder="np. 12 albo 12.5">
+          </label>
+          <label>
+            Numer sezonu
+            <input id="chapterSeason" placeholder="opcjonalne">
+          </label>
+          <label>
+            Data publikacji
+            <input id="chapterDate" type="datetime-local">
+          </label>
+          <label>
+            Pliki rozdziału
+            <input id="chapterFiles" type="file" accept="image/*" multiple>
+          </label>
+          <div class="upload-list" id="uploadList"></div>
+          <label>
+            Kto tłumaczył ten rozdział
+            <select id="chapterTranslatorSelect" multiple></select>
+          </label>
+          <button class="primary-button" type="submit">Dodaj rozdział</button>
+        </form>
+        <button class="ghost-button side-admin-button" type="button" data-view="data">Dane</button>
+      </section>
+
+      <section class="view" id="dataView" data-view-name="data">
+        <div class="panel-heading">
+          <h1>Dane</h1>
+          <p>Konfiguracja Discorda, licznika z kanału i ról użytkowników.</p>
+        </div>
+
+        <form id="dataForm" class="form-shell">
+          <div class="two-columns">
+            <label>
+              Client ID aplikacji Discord
+              <input id="discordClientId" placeholder="np. 123456789012345678">
+            </label>
+            <label>
+              Redirect link
+              <input id="discordRedirectUri" placeholder="https://twojadomena.pl/api/auth/discord/callback">
+            </label>
+          </div>
+          <div class="two-columns">
+            <label>
+              ID kanału z liczbą osób
+              <input id="discordCountChannelId" placeholder="ID kanału, np. 123456789012345678">
+            </label>
+            <label>
+              ID roli Tłumacz
+              <input id="discordTranslatorRoleId" placeholder="ID roli z Discorda">
+            </label>
+          </div>
+          <button class="primary-button" type="submit">Zapisz dane</button>
+        </form>
+
+        <section class="role-panel">
+          <div class="section-heading">
+            <h2>Role użytkowników</h2>
+            <p>Domyślnie każdy zalogowany użytkownik dostaje rolę Czytelnik.</p>
+          </div>
+          <div class="role-grid" id="roleGrid"></div>
+        </section>
+
+        <section class="discord-note">
+          <h2>Jak połączyć licznik z Discordem</h2>
+          <p>
+            Frontend zapamiętuje ID kanału, ale realną liczbę musi pobrać backend z botem Discorda. Endpoint
+            <code>/api/discord/stats</code> powinien użyć tokenu bota po stronie serwera, odczytać kanał po ID
+            i zwrócić liczbę w formacie <code>{ "members": 123, "translators": 4 }</code>.
+          </p>
+        </section>
+      </section>
+
+
+    </main>
+
+    <footer class="footer">
+      <div>
+        <button type="button">Regulamin</button>
+        <button type="button">Polityka prywatności</button>
+      </div>
+      <p>© 2026 BunBun Translations</p>
+    </footer>
+
+    <script src="site-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
+
