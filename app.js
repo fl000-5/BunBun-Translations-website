@@ -628,18 +628,41 @@
   }
 
   async function publishChapterToServer(titleId, chapter) {
-    if (!hasBackend()) return;
-    try {
-      const response = await fetch(apiUrl(CHAPTER_PUBLISH), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ titleId, titleName: (findTitle(titleId) || {}).title || "", chapter: normalizeChapter(chapter, findTitle(titleId) || { cover: "", translators: [] }) })
-      });
-      if (!response.ok) throw new Error(`chapter_publish_${response.status}`);
-    } catch {
-      // Lokalny zapis pozostaje źródłem awaryjnym.
+    if (!hasBackend()) {
+      throw new Error("Brak połączenia z backendem.");
     }
+
+    const title = findTitle(titleId);
+    if (!title) throw new Error("Nie znaleziono wybranego tytułu.");
+
+    // Upewnij się, że najnowsze ustawienia tytułu (w tym ID kanału)
+    // są zapisane na backendzie przed publikacją rozdziału.
+    const saved = await saveTitleToServer(title, false);
+    if (!saved) {
+      throw new Error("Nie udało się zapisać ustawień tytułu na serwerze.");
+    }
+
+    const response = await fetch(apiUrl(CHAPTER_PUBLISH), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        titleId,
+        titleName: title.title || "",
+        title,
+        chapter: normalizeChapter(chapter, title)
+      })
+    });
+
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+
+    if (!response.ok) {
+      const message = payload?.error || `chapter_publish_${response.status}`;
+      throw new Error(message);
+    }
+
+    return payload;
   }
 
   function renderLatest() {
@@ -1590,14 +1613,28 @@
 
   async function handleAddChapter(event) {
     event.preventDefault();
-    const title = findTitle(document.querySelector("#chapterTitleSelect").value);
-    if (!title) return;
 
-    const pages = state.uploadedPages.length
-      ? await Promise.all(state.uploadedPages.map((page) => fileToDataUrl(page.file)))
-      : [title.cover, title.cover, title.cover];
-    const selectedTranslators = selectedValues(document.querySelector("#chapterTranslatorSelect"));
+    const form = event.currentTarget;
+    const title = findTitle(document.querySelector("#chapterTitleSelect").value);
+    if (!title) {
+      alert("Nie wybrano tytułu. Jeśli lista jest pusta, odśwież stronę po zapisaniu tytułu.");
+      return;
+    }
+
+    if (!state.uploadedPages.length) {
+      alert("Dodaj co najmniej jeden panel rozdziału.");
+      return;
+    }
+
     const number = document.querySelector("#chapterNumber").value.trim();
+    if (!number) {
+      alert("Wpisz numer rozdziału.");
+      return;
+    }
+
+    const selectedTranslators = selectedValues(document.querySelector("#chapterTranslatorSelect"));
+    const pages = await Promise.all(state.uploadedPages.map((page) => fileToDataUrl(page.file)));
+
     const chapter = {
       id: `${title.id}-chapter-${slugify(number)}-${Date.now()}`,
       number: `Rozdział ${number}`,
@@ -1610,14 +1647,45 @@
       pages
     };
 
-    title.chapters.push(chapter);
-    await publishChapterToServer(title.id, chapter);
-    state.uploadedPages = [];
-    event.target.reset();
-    renderUploadList();
-    persistState();
-    renderAll();
-    openTitle(title.id);
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalText = submitButton?.textContent || "Dodaj rozdział";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Publikowanie…";
+    }
+
+    try {
+      await publishChapterToServer(title.id, chapter);
+
+      // Dopiero po potwierdzeniu backendu dodajemy rozdział lokalnie.
+      title.chapters.push(chapter);
+      state.uploadedPages = [];
+      form.reset();
+      renderUploadList();
+      persistState();
+      renderAll();
+      openTitle(title.id);
+      alert("Rozdział został wysłany na kanał Discorda. Nagłówek został przypięty, a panele są wyświetlane na stronie bezpośrednio z Discorda.");
+    } catch (error) {
+      console.error("Publikowanie rozdziału nie powiodło się:", error);
+      const reason = String(error?.message || "Nieznany błąd.");
+      const messages = {
+        not_logged_in: "Sesja logowania wygasła. Zaloguj się ponownie.",
+        insufficient_site_role: "Nie masz uprawnień do publikowania rozdziałów.",
+        not_assigned_to_title: "Nie jesteś przypisany do tego tytułu.",
+        title_not_found: "Tytuł nie został jeszcze zapisany na backendzie.",
+        title_channel_id_missing: "Ten tytuł nie ma ustawionego ID kanału Discord. Uzupełnij je w „Edytuj tytuł”.",
+        title_channel_not_found_or_not_text: "Nie znaleziono kanału rozdziałów albo bot nie ma do niego dostępu.",
+        discord_not_configured: "Bot Discord nie jest poprawnie skonfigurowany.",
+        chapter_upload_failed: "Nie udało się zapisać paneli rozdziału."
+      };
+      alert(`Nie udało się dodać rozdziału.\n\n${messages[reason] || reason}`);
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
+      }
+    }
   }
 
   function handleSaveData(event) {
